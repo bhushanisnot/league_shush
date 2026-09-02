@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Daily League</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   ██  EVERYTHING YOU EVER EDIT IS IN THIS BOX.  ██
+   Nothing below it needs touching.
+
+   1. NAMES   — the roster. Remove a name and they vanish from the league.
+   2. GAMES   — the games in play, in the order you want them shown.
+   3. LOG     — one line per game per day:
+                  DATE | GAME | Name time, Name time, Name time
+
+                Times are m:ss (1:23), h:mm:ss (1:02:03), or plain
+                seconds (83). Order inside the line doesn't matter —
+                the clock decides.
+
+                DIDN'T PLAY? Write the name with no time after it, or
+                put a dash: "Nisha Patel" or "Nisha Patel -". Either way
+                they score nothing and it's recorded as a miss. Leave
+                the name off the line entirely and it's the same zero,
+                just not counted as a miss.
+
+   4. POINTS  — the scoring curve, fastest first. Finish outside it, or
+                sit the game out, and you score nothing. Identical times
+                share the position and its points, and the next player
+                drops by however many were level.
+
+   The league week runs Monday to Sunday. The weekly table clears every
+   Monday; the monthly, yearly and all-time tables keep accumulating.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const LEAGUE = "The Daily League";
+
+/* Points for 1st, 2nd, 3rd … Edit freely — the whole site recalculates
+   from it, including every past week. A steeper front end (say
+   14,10,8,6,5,4,3,2,1) rewards winning harder; a flat one rewards
+   turning up. */
+const POINTS = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+/* Monday that Week #1 begins on. Leave it blank to number weeks from
+   whatever your earliest logged day is. */
+const SEASON_START = "2026-08-17";
+
+const NAMES = `
+Shashank, Sreshtha Mondal, Aarav Parmar, Mrudang Oza, Shreyansh Choudhary, Shivangi Tikekar, Bhushan Patel, Nisha Patel, Soham Dave
+`;
+
+const GAMES = `
+Queens, Tango, Zip, Wend, Crossclimb, Mini Sudoku, Patches
+`;
+
+const LOG = `
+2026-08-29 | Wend | Shashank 1:19, Sreshtha Mondal 1:29, Aarav Parmar 0:53, Mrudang Oza 1:49, Shreyansh Choudhary 0:52, Shivangi Tikekar 0:57, Bhushan Patel 1:00, Nisha Patel 1:21, Soham Dave -
+2026-08-29 | Zip | Shashank 0:38, Sreshtha Mondal 0:20, Aarav Parmar 0:18, Mrudang Oza 0:58, Shreyansh Choudhary 0:17, Shivangi Tikekar 0:13, Bhushan Patel 0:31, Nisha Patel 0:15, Soham Dave -
+2026-08-29 | Patches | Shashank 1:53, Sreshtha Mondal 2:31, Aarav Parmar 0:21, Mrudang Oza 1:43, Shreyansh Choudhary 0:13, Shivangi Tikekar 0:47, Bhushan Patel 1:04, Nisha Patel 0:43, Soham Dave -
+2026-08-29 | Mini Sudoku | Shashank 1:03, Sreshtha Mondal 1:03, Aarav Parmar 0:43, Mrudang Oza 1:08, Shreyansh Choudhary 0:50, Shivangi Tikekar 0:54, Bhushan Patel 1:05, Nisha Patel 1:07, Soham Dave -
+2026-08-29 | Tango | Shashank 1:28, Sreshtha Mondal 1:51, Aarav Parmar 0:44, Mrudang Oza 2:08, Shreyansh Choudhary 0:32, Shivangi Tikekar 0:36, Bhushan Patel 1:01, Nisha Patel 2:11, Soham Dave -
+2026-08-29 | Queens | Shashank 3:07, Sreshtha Mondal 0:51, Aarav Parmar 0:35, Mrudang Oza 0:50, Shreyansh Choudhary 0:46, Shivangi Tikekar 2:54, Bhushan Patel 0:50, Nisha Patel 1:00, Soham Dave -
+2026-08-29 | Crossclimb | Shashank 1:01, Sreshtha Mondal -, Aarav Parmar 0:31, Mrudang Oza 2:40, Shreyansh Choudhary 1:04, Shivangi Tikekar 0:21, Bhushan Patel 0:46, Nisha Patel 1:33, Soham Dave -
+
+2026-08-28 | Wend     | Shashank -, Sreshtha Mondal 2:34, Aarav Parmar 0:57, Mrudang Oza 2:11, Shreyansh Choudhary 0:35, Shivangi Tikekar 0:20, Bhushan Patel 0:29, Nisha Patel 1:46, Soham Dave 1:16
+2026-08-28 | Zip      | Shashank -, Sreshtha Mondal 0:27, Aarav Parmar 0:15, Mrudang Oza 0:13, Shreyansh Choudhary 0:06, Shivangi Tikekar 0:04, Bhushan Patel 0:06, Nisha Patel 0:21, Soham Dave 0:10
+2026-08-28 | Patches  | Shashank -, Sreshtha Mondal -, Aarav Parmar 0:33, Mrudang Oza 1:08, Shreyansh Choudhary 0:42, Shivangi Tikekar 0:40, Bhushan Patel 0:41, Nisha Patel 1:07, Soham Dave 0:17
+2026-08-28 | Mini Sudoku | Shashank -, Sreshtha Mondal 1:13, Aarav Parmar -, Mrudang Oza 1:07, Shreyansh Choudhary 0:26, Shivangi Tikekar 1:08, Bhushan Patel 0:47, Nisha Patel 1:02, Soham Dave 1:02
+2026-08-28 | Tango    | Shashank -, Sreshtha Mondal 0:55, Aarav Parmar 0:45, Mrudang Oza 1:52, Shreyansh Choudhary 0:24, Shivangi Tikekar 0:29, Bhushan Patel 0:56, Nisha Patel 0:52, Soham Dave 0:27
+2026-08-28 | Queens   | Shashank -, Sreshtha Mondal 1:03, Aarav Parmar 0:31, Mrudang Oza 1:01, Shreyansh Choudhary 0:37, Shivangi Tikekar 1:24, Bhushan Patel 1:05, Nisha Patel 1:04, Soham Dave 2:41
+2026-08-28 | Crossclimb | Shashank -, Sreshtha Mondal 1:23, Aarav Parmar 0:44, Mrudang Oza 1:33, Shreyansh Choudhary 1:10, Shivangi Tikekar 0:45, Bhushan Patel 0:35, Nisha Patel 0:43, Soham Dave 1:22
+
+2026-08-27 | Wend | Shashank -, Sreshtha Mondal 1:05, Aarav Parmar 1:11, Mrudang Oza 0:31, Shreyansh Choudhary 0:21, Shivangi Tikekar 0:33, Bhushan Patel 0:36, Nisha Patel 0:36, Soham Dave 0:31
+2026-08-27 | Zip | Shashank -, Sreshtha Mondal 0:36, Aarav Parmar 0:17, Mrudang Oza 0:07, Shreyansh Choudhary 0:47, Shivangi Tikekar 0:08, Bhushan Patel 0:19, Nisha Patel 0:10, Soham Dave 0:25
+2026-08-27 | Patches | Shashank -, Sreshtha Mondal 0:18, Aarav Parmar 0:21, Mrudang Oza 0:40, Shreyansh Choudhary 0:07, Shivangi Tikekar 0:30, Bhushan Patel 0:20, Nisha Patel 0:34, Soham Dave 0:08
+2026-08-27 | Mini Sudoku | Shashank -, Sreshtha Mondal 1:02, Aarav Parmar 1:08, Mrudang Oza 1:24, Shreyansh Choudhary 0:54, Shivangi Tikekar 1:05, Bhushan Patel 0:43, Nisha Patel 1:03, Soham Dave 0:50
+2026-08-27 | Tango | Shashank -, Sreshtha Mondal 0:52, Aarav Parmar 0:55, Mrudang Oza 2:22, Shreyansh Choudhary 0:32, Shivangi Tikekar 0:27, Bhushan Patel 0:33, Nisha Patel 1:07, Soham Dave 0:23
+2026-08-27 | Queens | Shashank -, Sreshtha Mondal 1:09, Aarav Parmar 0:28, Mrudang Oza 0:47, Shreyansh Choudhary 0:33, Shivangi Tikekar 0:38, Bhushan Patel 0:49, Nisha Patel 0:51, Soham Dave 0:29
+2026-08-27 | Crossclimb | Shashank -, Sreshtha Mondal 1:07, Aarav Parmar 0:46, Mrudang Oza 2:07, Shreyansh Choudhary 1:17, Shivangi Tikekar 0:23, Bhushan Patel 0:50, Nisha Patel 0:55, Soham Dave 0:44
+
+2026-08-26 | Wend | Shashank 0:36, Sreshtha Mondal 0:35, Aarav Parmar 0:31, Mrudang Oza 0:51, Shreyansh Choudhary 0:13, Shivangi Tikekar 0:14, Bhushan Patel 0:55, Nisha Patel 0:37, Soham Dave 0:26
+2026-08-26 | Zip | Shashank 0:17, Sreshtha Mondal 0:14, Aarav Parmar 0:20, Mrudang Oza 0:23, Shreyansh Choudhary 0:11, Shivangi Tikekar 0:07, Bhushan Patel 0:08, Nisha Patel 0:13, Soham Dave 0:10
+2026-08-26 | Patches | Shashank 0:20, Sreshtha Mondal 0:27, Aarav Parmar 0:10, Mrudang Oza 0:27, Shreyansh Choudhary 0:07, Shivangi Tikekar 0:08, Bhushan Patel 0:12, Nisha Patel 0:11, Soham Dave 0:10
+2026-08-26 | Mini Sudoku | Shashank 1:00, Sreshtha Mondal 1:17, Aarav Parmar 1:17, Mrudang Oza 1:18, Shreyansh Choudhary 0:36, Shivangi Tikekar 1:03, Bhushan Patel 1:06, Nisha Patel 1:24, Soham Dave 0:38
+2026-08-26 | Tango | Shashank 0:59, Sreshtha Mondal 0:56, Aarav Parmar 0:35, Mrudang Oza 0:45, Shreyansh Choudhary 0:27, Shivangi Tikekar 0:19, Bhushan Patel 0:27, Nisha Patel 0:28, Soham Dave 0:22
+2026-08-26 | Queens | Shashank 1:04, Sreshtha Mondal 0:32, Aarav Parmar 0:26, Mrudang Oza 0:58, Shreyansh Choudhary 0:36, Shivangi Tikekar 0:28, Bhushan Patel 0:42, Nisha Patel 0:35, Soham Dave 0:26
+2026-08-26 | Crossclimb | Shashank 1:24, Sreshtha Mondal 0:45, Aarav Parmar 0:30, Mrudang Oza 1:42, Shreyansh Choudhary 0:54, Shivangi Tikekar 0:22, Bhushan Patel 0:46, Nisha Patel 0:49, Soham Dave 1:19
+
+2026-08-25 | Wend | Shashank 0:36, Sreshtha Mondal 0:24, Aarav Parmar 0:28, Mrudang Oza 1:38, Shreyansh Choudhary 0:17, Shivangi Tikekar 0:15, Bhushan Patel 0:23, Nisha Patel 0:20, Soham Dave 0:32
+2026-08-25 | Zip | Shashank 0:11, Sreshtha Mondal 0:19, Aarav Parmar 0:16, Mrudang Oza 0:14, Shreyansh Choudhary 0:13, Shivangi Tikekar 0:07, Bhushan Patel 0:11, Nisha Patel 0:11, Soham Dave 0:07
+2026-08-25 | Patches | Shashank 0:13, Sreshtha Mondal 0:29, Aarav Parmar 0:09, Mrudang Oza 0:37, Shreyansh Choudhary 0:15, Shivangi Tikekar 0:31, Bhushan Patel 0:36, Nisha Patel 0:18, Soham Dave 0:15
+2026-08-25 | Mini Sudoku | Shashank 0:44, Sreshtha Mondal 1:07, Aarav Parmar 0:35, Mrudang Oza 2:40, Shreyansh Choudhary 0:57, Shivangi Tikekar 1:03, Bhushan Patel 1:18, Nisha Patel 0:42, Soham Dave 0:44
+2026-08-25 | Tango | Shashank 0:48, Sreshtha Mondal 0:36, Aarav Parmar 0:48, Mrudang Oza 0:47, Shreyansh Choudhary 0:25, Shivangi Tikekar 0:29, Bhushan Patel 1:02, Nisha Patel 0:47, Soham Dave 0:29
+2026-08-25 | Queens | Shashank 0:52, Sreshtha Mondal 1:52, Aarav Parmar 0:16, Mrudang Oza 0:38, Shreyansh Choudhary 0:09, Shivangi Tikekar 0:17, Bhushan Patel 0:39, Nisha Patel 0:46, Soham Dave 0:21
+2026-08-25 | Crossclimb | Shashank 1:11, Sreshtha Mondal 0:55, Aarav Parmar 0:41, Mrudang Oza 2:55, Shreyansh Choudhary 0:55, Shivangi Tikekar 0:20, Bhushan Patel 0:41, Nisha Patel 0:46, Soham Dave 1:16
+
+2026-08-24 | Wend | Shashank 0:18, Sreshtha Mondal 0:53, Aarav Parmar 0:34, Mrudang Oza 1:29, Shreyansh Choudhary 0:21, Shivangi Tikekar 0:35, Bhushan Patel 0:47, Nisha Patel 0:44, Soham Dave 0:14
+2026-08-24 | Zip | Shashank 0:12, Sreshtha Mondal 0:08, Aarav Parmar 0:04, Mrudang Oza 0:09, Shreyansh Choudhary 0:08, Shivangi Tikekar 0:08, Bhushan Patel 0:15, Nisha Patel 0:08, Soham Dave 0:05
+2026-08-24 | Patches | Shashank 0:16, Sreshtha Mondal 0:08, Aarav Parmar 0:08, Mrudang Oza 0:07, Shreyansh Choudhary 0:22, Shivangi Tikekar 0:05, Bhushan Patel 0:06, Nisha Patel 0:09, Soham Dave 0:06
+2026-08-24 | Mini Sudoku | Shashank 1:02, Sreshtha Mondal 0:44, Aarav Parmar 0:22, Mrudang Oza 0:54, Shreyansh Choudhary 0:26, Shivangi Tikekar 0:45, Bhushan Patel 0:33, Nisha Patel 0:41, Soham Dave 1:02
+2026-08-24 | Tango | Shashank 1:17, Sreshtha Mondal 0:40, Aarav Parmar 0:36, Mrudang Oza 0:48, Shreyansh Choudhary 0:24, Shivangi Tikekar 0:18, Bhushan Patel 0:30, Nisha Patel 0:26, Soham Dave 0:27
+2026-08-24 | Queens | Shashank 1:25, Sreshtha Mondal 0:30, Aarav Parmar 0:16, Mrudang Oza 0:53, Shreyansh Choudhary 0:10, Shivangi Tikekar 0:32, Bhushan Patel 1:32, Nisha Patel 0:41, Soham Dave 0:35
+2026-08-24 | Crossclimb | Shashank 0:43, Sreshtha Mondal 0:54, Aarav Parmar 0:29, Mrudang Oza 0:54, Shreyansh Choudhary 0:59, Shivangi Tikekar 0:19, Bhushan Patel 0:34, Nisha Patel 0:43, Soham Dave 0:43
+
+
+2026-08-23 | Wend | Shashank 0:57, Sreshtha Mondal 2:27, Aarav Parmar 0:52, Mrudang Oza 1:43, Shreyansh Choudhary 0:56, Shivangi Tikekar 0:24, Bhushan Patel 0:44, Nisha Patel 1:40, Soham Dave 0:27
+2026-08-23 | Zip | Shashank 1:09, Sreshtha Mondal 0:46, Aarav Parmar 0:40, Mrudang Oza 2:26, Shreyansh Choudhary 1:04, Shivangi Tikekar 0:26, Bhushan Patel 0:35, Nisha Patel 0:16, Soham Dave 1:41
+2026-08-23 | Patches | Shashank 2:13, Sreshtha Mondal 3:46, Aarav Parmar 0:45, Mrudang Oza 1:14, Shreyansh Choudhary 1:24, Shivangi Tikekar 1:14, Bhushan Patel 2:53, Nisha Patel 1:04, Soham Dave 2:13
+2026-08-23 | Mini Sudoku | Shashank 0:56, Sreshtha Mondal 1:17, Aarav Parmar 0:29, Mrudang Oza 2:21, Shreyansh Choudhary 0:58, Shivangi Tikekar 1:18, Bhushan Patel 1:55, Nisha Patel 1:21, Soham Dave 1:09
+2026-08-23 | Tango | Shashank 2:22, Sreshtha Mondal 1:55, Aarav Parmar 1:05, Mrudang Oza 2:37, Shreyansh Choudhary 1:53, Shivangi Tikekar 0:49, Bhushan Patel 1:21, Nisha Patel 4:59, Soham Dave 0:58
+2026-08-23 | Queens | Shashank 3:00, Sreshtha Mondal 1:42, Aarav Parmar 0:39, Mrudang Oza 1:13, Shreyansh Choudhary 1:32, Shivangi Tikekar 1:37, Bhushan Patel 1:43, Nisha Patel 1:13, Soham Dave 2:51
+2026-08-23 | Crossclimb | Shashank 2:07, Sreshtha Mondal 2:33, Aarav Parmar 0:49, Mrudang Oza 2:28, Shreyansh Choudhary 0:51, Shivangi Tikekar 0:34, Bhushan Patel 0:49, Nisha Patel 1:20, Soham Dave 1:25
+
+2026-08-22 | Wend | Shashank 0:40, Sreshtha Mondal 2:09, Aarav Parmar 0:34, Mrudang Oza 3:39, Shreyansh Choudhary 0:25, Shivangi Tikekar 0:26, Bhushan Patel 0:56, Nisha Patel 1:17, Soham Dave 0:39
+2026-08-22 | Zip | Shashank 1:04, Sreshtha Mondal 0:45, Aarav Parmar 0:13, Mrudang Oza 1:35, Shreyansh Choudhary 0:36, Shivangi Tikekar 0:10, Bhushan Patel 0:21, Nisha Patel 0:50, Soham Dave 0:09
+2026-08-22 | Patches | Shashank 1:17, Sreshtha Mondal 2:16, Aarav Parmar 0:26, Mrudang Oza 1:47, Shreyansh Choudhary 0:37, Shivangi Tikekar 0:14, Bhushan Patel 0:43, Nisha Patel 0:35, Soham Dave 0:19
+2026-08-22 | Mini Sudoku | Shashank 1:06, Sreshtha Mondal 1:10, Aarav Parmar 0:39, Mrudang Oza 1:33, Shreyansh Choudhary 1:14, Shivangi Tikekar 1:19, Bhushan Patel 1:18, Nisha Patel 0:50, Soham Dave 1:08
+2026-08-22 | Tango | Shashank 0:53, Sreshtha Mondal 1:58, Aarav Parmar 0:50, Mrudang Oza 0:56, Shreyansh Choudhary 0:31, Shivangi Tikekar 0:29, Bhushan Patel 0:40, Nisha Patel 1:04, Soham Dave 0:22
+2026-08-22 | Queens | Shashank 1:29, Sreshtha Mondal 1:39, Aarav Parmar 0:29, Mrudang Oza 0:53, Shreyansh Choudhary 0:33, Shivangi Tikekar 0:53, Bhushan Patel 2:36, Nisha Patel 0:58, Soham Dave 1:00
+2026-08-22 | Crossclimb | Shashank 1:00, Sreshtha Mondal 0:57, Aarav Parmar 0:39, Mrudang Oza 1:51, Shreyansh Choudhary 1:09, Shivangi Tikekar 0:23, Bhushan Patel 0:54, Nisha Patel 1:43, Soham Dave 2:00
+
+2026-08-21 | Wend | Shashank 0:32, Sreshtha Mondal 2:42, Aarav Parmar 0:44, Mrudang Oza 2:36, Shreyansh Choudhary 0:39, Shivangi Tikekar 0:27, Bhushan Patel 0:51, Nisha Patel 1:09, Soham Dave 1:03
+2026-08-21 | Zip | Shashank 0:37, Sreshtha Mondal 0:20, Aarav Parmar 0:25, Mrudang Oza 0:18, Shreyansh Choudhary 0:13, Shivangi Tikekar 0:12, Bhushan Patel 0:14, Nisha Patel 0:14, Soham Dave 0:21
+2026-08-21 | Patches | Shashank 1:00, Sreshtha Mondal 1:55, Aarav Parmar 0:21, Mrudang Oza 0:39, Shreyansh Choudhary 1:39, Shivangi Tikekar 0:32, Bhushan Patel 0:33, Nisha Patel 0:54, Soham Dave 0:21
+2026-08-21 | Mini Sudoku | Shashank 1:25, Sreshtha Mondal 1:18, Aarav Parmar 0:40, Mrudang Oza 1:37, Shreyansh Choudhary 1:01, Shivangi Tikekar 1:20, Bhushan Patel 1:24, Nisha Patel 1:04, Soham Dave 1:07
+2026-08-21 | Tango | Shashank 1:04, Sreshtha Mondal 1:07, Aarav Parmar 0:54, Mrudang Oza 0:57, Shreyansh Choudhary 0:29, Shivangi Tikekar 0:21, Bhushan Patel 0:56, Nisha Patel 1:35, Soham Dave 0:26
+2026-08-21 | Queens | Shashank 2:05, Sreshtha Mondal 0:55, Aarav Parmar 0:26, Mrudang Oza 1:09, Shreyansh Choudhary 0:48, Shivangi Tikekar 0:50, Bhushan Patel 0:42, Nisha Patel 0:41, Soham Dave 0:32
+2026-08-21 | Crossclimb | Shashank 1:33, Sreshtha Mondal 2:10, Aarav Parmar 0:48, Mrudang Oza 2:04, Shreyansh Choudhary 1:09, Shivangi Tikekar 0:25, Bhushan Patel 0:53, Nisha Patel 1:08, Soham Dave 1:51
+
+2026-08-20 | Wend | Shashank 0:46, Sreshtha Mondal 0:47, Aarav Parmar 0:16, Mrudang Oza 1:09, Shreyansh Choudhary 0:26, Shivangi Tikekar 0:19, Bhushan Patel 0:24, Nisha Patel 0:23, Soham Dave 0:24
+2026-08-20 | Zip | Shashank 0:33, Sreshtha Mondal 0:38, Aarav Parmar 0:19, Mrudang Oza 3:17, Shreyansh Choudhary 1:10, Shivangi Tikekar 0:23, Bhushan Patel 0:54, Nisha Patel 0:33, Soham Dave 1:39
+2026-08-20 | Patches | Shashank 0:19, Sreshtha Mondal 0:18, Aarav Parmar 0:13, Mrudang Oza 0:20, Shreyansh Choudhary 0:40, Shivangi Tikekar 0:21, Bhushan Patel 0:14, Nisha Patel 0:11, Soham Dave 0:06
+2026-08-20 | Mini Sudoku | Shashank 1:08, Sreshtha Mondal 2:03, Aarav Parmar 0:43, Mrudang Oza 1:31, Shreyansh Choudhary 1:45, Shivangi Tikekar 0:49, Bhushan Patel 1:22, Nisha Patel 1:13, Soham Dave 1:20
+2026-08-20 | Tango | Shashank 0:51, Sreshtha Mondal 2:02, Aarav Parmar 0:47, Mrudang Oza 0:48, Shreyansh Choudhary 0:26, Shivangi Tikekar 0:25, Bhushan Patel 1:04, Nisha Patel 0:27, Soham Dave 0:20
+2026-08-20 | Queens | Shashank 4:59, Sreshtha Mondal 1:02, Aarav Parmar 0:37, Mrudang Oza 0:47, Shreyansh Choudhary 1:02, Shivangi Tikekar 0:37, Bhushan Patel 1:08, Nisha Patel 1:14, Soham Dave 3:05
+2026-08-20 | Crossclimb | Shashank 1:43, Sreshtha Mondal 1:40, Aarav Parmar 0:37, Mrudang Oza 1:27, Shreyansh Choudhary 1:06, Shivangi Tikekar 0:19, Bhushan Patel 0:34, Nisha Patel 0:40, Soham Dave 2:15
+
+2026-08-19 | Wend | Shashank 0:24, Sreshtha Mondal 1:13, Aarav Parmar 0:38, Mrudang Oza 0:53, Shreyansh Choudhary 0:53, Shivangi Tikekar 0:28, Bhushan Patel 1:31, Nisha Patel 1:02, Soham Dave 0:36
+2026-08-19 | Zip | Shashank 0:33, Sreshtha Mondal 0:23, Aarav Parmar 0:15, Mrudang Oza 0:22, Shreyansh Choudhary 0:06, Shivangi Tikekar 0:07, Bhushan Patel 0:07, Nisha Patel 0:10, Soham Dave 0:06
+2026-08-19 | Patches | Shashank 0:55, Sreshtha Mondal 0:13, Aarav Parmar 0:08, Mrudang Oza 0:31, Shreyansh Choudhary 0:06, Shivangi Tikekar 0:10, Bhushan Patel 0:10, Nisha Patel 0:15, Soham Dave 0:05
+2026-08-19 | Mini Sudoku | Shashank 1:00, Sreshtha Mondal 1:00, Aarav Parmar 1:34, Mrudang Oza 1:00, Shreyansh Choudhary 1:08, Shivangi Tikekar 0:45, Bhushan Patel 0:57, Nisha Patel 0:55, Soham Dave 0:39
+2026-08-19 | Tango | Shashank 0:42, Sreshtha Mondal 0:48, Aarav Parmar 0:49, Mrudang Oza 0:59, Shreyansh Choudhary 0:20, Shivangi Tikekar 0:20, Bhushan Patel 0:51, Nisha Patel 0:22, Soham Dave 0:17
+2026-08-19 | Queens | Shashank 1:31, Sreshtha Mondal 1:52, Aarav Parmar 0:28, Mrudang Oza 1:17, Shreyansh Choudhary 0:31, Shivangi Tikekar 0:39, Bhushan Patel 0:51, Nisha Patel 0:45, Soham Dave 1:10
+2026-08-19 | Crossclimb | Shashank 1:05, Sreshtha Mondal 1:22, Aarav Parmar 0:38, Mrudang Oza 1:09, Shreyansh Choudhary 0:44, Shivangi Tikekar 0:20, Bhushan Patel 0:27, Nisha Patel 0:40, Soham Dave 0:37
+
+2026-08-18 | Wend | Shashank 0:18, Sreshtha Mondal 0:19, Aarav Parmar 0:08, Mrudang Oza 1:19, Shreyansh Choudhary 0:13, Shivangi Tikekar 0:17, Bhushan Patel 0:19, Nisha Patel 0:26, Soham Dave 0:08
+2026-08-18 | Zip | Shashank 0:12, Sreshtha Mondal 0:20, Aarav Parmar 0:13, Mrudang Oza 0:22, Shreyansh Choudhary 0:17, Shivangi Tikekar 0:05, Bhushan Patel 0:10, Nisha Patel 0:10, Soham Dave 0:07
+2026-08-18 | Patches | Shashank 0:33, Sreshtha Mondal 0:36, Aarav Parmar 0:13, Mrudang Oza 0:22, Shreyansh Choudhary 0:30, Shivangi Tikekar 0:12, Bhushan Patel 0:32, Nisha Patel 0:41, Soham Dave 0:16
+2026-08-18 | Mini Sudoku | Shashank 0:41, Sreshtha Mondal 1:30, Aarav Parmar 1:45, Mrudang Oza 1:51, Shreyansh Choudhary 0:29, Shivangi Tikekar 0:50, Bhushan Patel 1:11, Nisha Patel 1:01, Soham Dave 0:46
+2026-08-18 | Tango | Shashank 0:54, Sreshtha Mondal 0:46, Aarav Parmar 0:24, Mrudang Oza 0:56, Shreyansh Choudhary 0:18, Shivangi Tikekar 0:21, Bhushan Patel 0:32, Nisha Patel 0:27, Soham Dave 0:20
+2026-08-18 | Queens | Shashank 0:45, Sreshtha Mondal 0:18, Aarav Parmar 0:14, Mrudang Oza 1:00, Shreyansh Choudhary 0:06, Shivangi Tikekar 0:22, Bhushan Patel 0:31, Nisha Patel 0:26, Soham Dave 0:39
+2026-08-18 | Crossclimb | Shashank 0:48, Sreshtha Mondal 1:05, Aarav Parmar 0:45, Mrudang Oza 0:56, Shreyansh Choudhary 0:31, Shivangi Tikekar 0:23, Bhushan Patel 0:30, Nisha Patel 0:50, Soham Dave 1:33
+
+2026-08-17 | Wend | Shashank 0:16, Sreshtha Mondal 0:27, Aarav Parmar 0:15, Mrudang Oza 0:17, Shreyansh Choudhary 0:11, Shivangi Tikekar 0:07, Bhushan Patel 0:24, Nisha Patel 0:23, Soham Dave 0:16
+2026-08-17 | Zip | Shashank 0:11, Sreshtha Mondal 0:12, Aarav Parmar 0:08, Mrudang Oza 0:11, Shreyansh Choudhary 0:08, Shivangi Tikekar 0:05, Bhushan Patel 0:20, Nisha Patel 0:07, Soham Dave 0:07
+2026-08-17 | Patches | Shashank 0:15, Sreshtha Mondal 0:11, Aarav Parmar 0:08, Mrudang Oza 0:13, Shreyansh Choudhary 0:09, Shivangi Tikekar 0:08, Bhushan Patel 0:13, Nisha Patel 0:12, Soham Dave 0:08
+2026-08-17 | Mini Sudoku | Shashank 0:36, Sreshtha Mondal 0:43, Aarav Parmar -, Mrudang Oza 1:14, Shreyansh Choudhary 0:18, Shivangi Tikekar 0:36, Bhushan Patel 0:56, Nisha Patel 1:02, Soham Dave 0:37
+2026-08-17 | Tango | Shashank 0:53, Sreshtha Mondal 0:27, Aarav Parmar 0:34, Mrudang Oza 0:49, Shreyansh Choudhary 0:26, Shivangi Tikekar 0:27, Bhushan Patel 0:38, Nisha Patel 0:24, Soham Dave 0:46
+2026-08-17 | Queens | Shashank 0:43, Sreshtha Mondal 0:26, Aarav Parmar 0:09, Mrudang Oza 0:34, Shreyansh Choudhary 0:17, Shivangi Tikekar 0:12, Bhushan Patel 0:25, Nisha Patel 0:25, Soham Dave 0:30
+2026-08-17 | Crossclimb | Shashank 1:42, Sreshtha Mondal 1:09, Aarav Parmar 0:44, Mrudang Oza 1:41, Shreyansh Choudhary 0:40, Shivangi Tikekar 0:31, Bhushan Patel 0:45, Nisha Patel 1:07, Soham Dave -
+`;
+
+/* ══════════════════ nothing to edit past this line ══════════════════ */
+</script>
+
+<style>
+  /* ═══════════════ tokens ═══════════════ */
+  :root{
+    --board:#E7EBF3; --paper:#F5F8FC; --card:#FFFFFF;
+    --ink:#12151D; --muted:#59627A; --faint:#8B94A9;
+    --rule:#CDD4E2; --rule-soft:#E6EAF2;
+    --indigo:#242F84; --indigo-2:#4453C4; --indigo-soft:#ECEEF9; --on-indigo:#FFFFFF;
+    --gold:#BE871C; --silver:#8593A8; --bronze:#A8632F;
+    --miss:#DEE3EC; --plain:#93A6CE;
+    --warn-bg:#FBF3E3; --warn-line:#E4CF9E; --warn-ink:#6A5628; --warn-strong:#4E3F17; --warn-code:#F1E5C7;
+    --shadow-1:0 1px 2px rgba(18,21,29,.05), 0 2px 6px rgba(18,21,29,.035);
+    --shadow-2:0 2px 4px rgba(18,21,29,.05), 0 14px 32px -12px rgba(18,21,29,.16);
+    --grid:30px;
+    --disp:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+    --body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --pad:clamp(16px,3.6vw,26px);
+    --radius:14px;
+    --spring:cubic-bezier(.34,1.42,.64,1);
+    --ease:cubic-bezier(.16,.84,.35,1);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --board:#0B0E16; --paper:#151A28; --card:#171D2C;
+      --ink:#E8ECF6; --muted:#97A2BC; --faint:#6D7791;
+      --rule:#222A3C; --rule-soft:#222A3B;
+      --indigo:#8E9CFF; --indigo-2:#AEB7FF; --indigo-soft:#1A2137; --on-indigo:#0B0E16;
+      --gold:#E4B23E; --silver:#A6B3C9; --bronze:#CE8850;
+      --miss:#202737; --plain:#48598A;
+      --warn-bg:#2A2313; --warn-line:#574820; --warn-ink:#E5CE96; --warn-strong:#F3E2B6; --warn-code:#3B3119;
+      --shadow-1:0 1px 2px rgba(0,0,0,.45);
+      --shadow-2:0 14px 34px -14px rgba(0,0,0,.75);
+    }
+  }
+
+  /* ═══════════════ base ═══════════════ */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100dvh;
+    background:var(--board);
+    background-image:
+      linear-gradient(var(--rule) 1px,transparent 1px),
+      linear-gradient(90deg,var(--rule) 1px,transparent 1px);
+    background-size:var(--grid) var(--grid);
+    background-position:-1px -1px;
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:15px;line-height:1.45;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(120% 70% at 12% -10%, color-mix(in srgb, var(--indigo) 14%, transparent), transparent 60%),
+      radial-gradient(90% 60% at 100% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 55%);
+  }
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  :focus-visible{outline:2px solid var(--indigo-2);outline-offset:3px;border-radius:6px}
+  ::selection{background:var(--indigo);color:var(--on-indigo)}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .wrap{
+    position:relative;z-index:1;
+    max-width:760px;margin:0 auto;
+    padding:clamp(18px,4vw,34px) clamp(12px,3.5vw,20px) 80px;
+  }
+
+  /* ═══════════════ masthead ═══════════════ */
+  .eyebrow{
+    font-family:var(--mono);font-size:clamp(9.5px,2.4vw,11px);
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);
+    display:flex;align-items:center;gap:10px;margin-bottom:10px;
+  }
+  .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--rule),transparent)}
+  h1{
+    font-family:var(--disp);font-weight:800;
+    font-size:clamp(34px,11vw,60px);line-height:.92;letter-spacing:-.038em;
+    margin:0 0 6px;text-wrap:balance;
+    background:linear-gradient(165deg,var(--ink) 30%,var(--indigo));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .tagline{
+    color:var(--muted);font-size:clamp(12.5px,3vw,14px);margin:0 0 18px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ═══════════════ controls ═══════════════ */
+  .segmented{
+    display:flex;gap:4px;background:var(--paper);
+    border:1px solid var(--rule);border-radius:11px;padding:4px;
+    margin-bottom:10px;box-shadow:var(--shadow-1);
+    overflow-x:auto;scrollbar-width:none;
+  }
+  .segmented::-webkit-scrollbar{display:none}
+  .segmented button{
+    flex:1 0 auto;border:0;background:transparent;color:var(--muted);
+    font-size:clamp(12.5px,3vw,14px);font-weight:500;
+    padding:10px 16px;min-height:42px;border-radius:8px;white-space:nowrap;
+    transition:background .18s ease,color .18s ease,box-shadow .18s ease,transform .12s ease;
+  }
+  .segmented button:hover{color:var(--ink)}
+  .segmented button:active{transform:scale(.97)}
+  .segmented button[aria-pressed="true"]{
+    background:linear-gradient(160deg,var(--indigo-2),var(--indigo));
+    color:var(--on-indigo);font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.16), 0 6px 14px -6px color-mix(in srgb, var(--indigo) 60%, transparent);
+  }
+
+  .chips{
+    display:flex;gap:6px;margin-bottom:16px;
+    overflow-x:auto;scrollbar-width:none;
+    scroll-snap-type:x proximity;padding-bottom:2px;
+  }
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;scroll-snap-align:start;
+    border:1px solid var(--rule);background:var(--paper);color:var(--muted);border-radius:999px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+    padding:9px 14px;min-height:38px;
+    transition:color .16s,border-color .16s,background .16s,transform .12s;
+  }
+  .chip:hover{color:var(--ink);border-color:var(--faint)}
+  .chip:active{transform:scale(.96)}
+  .chip[aria-pressed="true"]{
+    background:var(--indigo);border-color:var(--indigo);color:var(--on-indigo);
+    box-shadow:0 4px 12px -5px color-mix(in srgb, var(--indigo) 70%, transparent);
+  }
+
+  /* ═══════════════ panels ═══════════════ */
+  .panel{
+    background:var(--card);border:1px solid var(--rule-soft);
+    border-radius:var(--radius);margin-bottom:18px;
+    box-shadow:var(--shadow-1);
+    overflow-x:auto;overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;scrollbar-width:thin;
+    animation:panelIn .5s cubic-bezier(.16,.84,.35,1) both;
+  }
+  .panel::-webkit-scrollbar{height:6px}
+  .panel::-webkit-scrollbar-thumb{background:var(--rule);border-radius:99px}
+  .panel:nth-of-type(2){animation-delay:.07s}
+  .panel:nth-of-type(3){animation-delay:.13s}
+  .panel:nth-of-type(4){animation-delay:.18s}
+  @keyframes panelIn{from{opacity:0;transform:translateY(10px) scale(.995)}to{opacity:1;transform:none}}
+
+  .panel-head{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:14px var(--pad);border-bottom:1px solid var(--rule-soft);
+    position:sticky;left:0;
+  }
+  .panel-title{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--muted);white-space:nowrap;
+  }
+
+  /* ═══════════════ podium ═══════════════ */
+  .podium{
+    display:grid;grid-template-columns:1fr 1.22fr 1fr;
+    align-items:end;gap:1px;background:var(--rule-soft);
+  }
+  .step{
+    background:var(--card);padding:16px 10px 18px;text-align:center;
+    border-top:3px solid var(--miss);
+    animation:stepUp .55s cubic-bezier(.16,.84,.35,1) both;
+  }
+  .step:nth-child(1){animation-delay:.14s}
+  .step:nth-child(2){animation-delay:.04s}
+  .step:nth-child(3){animation-delay:.22s}
+  @keyframes stepUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .step.p1{
+    border-top-color:var(--gold);padding-top:30px;padding-bottom:26px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--gold) 13%, var(--card)), var(--card) 62%);
+  }
+  .step.p2{border-top-color:var(--silver);padding-top:22px}
+  .step.p3{border-top-color:var(--bronze)}
+  .step .medal{
+    font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--faint);
+  }
+  .step.p1 .medal{color:var(--gold)}
+  .step .nm{
+    font-family:var(--disp);font-weight:700;
+    font-size:clamp(13px,3.6vw,17px);letter-spacing:-.02em;line-height:1.15;
+    margin:6px 0 3px;overflow-wrap:break-word;word-break:normal;hyphens:none;
+  }
+  .step.p1 .nm{font-size:clamp(16px,4.6vw,23px)}
+  .step .pt{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .step .pt b{color:var(--ink);font-size:15px;font-weight:500}
+  .step.p1 .pt b{font-size:18px}
+
+  /* ═══════════════ kpis ═══════════════ */
+  .kpis{
+    display:grid;gap:1px;background:var(--rule-soft);margin:0;
+    grid-template-columns:repeat(auto-fit,minmax(clamp(112px,26vw,164px),1fr));
+  }
+  .kpi{background:var(--card);padding:18px var(--pad)}
+  .kpi dt{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 5px;
+  }
+  .kpi dd{
+    margin:0;font-family:var(--mono);font-size:clamp(18px,4.6vw,22px);
+    font-weight:500;font-variant-numeric:tabular-nums;line-height:1.1;
+  }
+  .kpi dd small{
+    font-family:var(--body);font-size:11.5px;color:var(--muted);
+    margin-left:5px;font-weight:400;
+  }
+  .kpi dd.name{
+    font-family:var(--disp);font-weight:700;
+    font-size:clamp(15px,4vw,19px);letter-spacing:-.02em;overflow-wrap:break-word;word-break:normal;hyphens:none;
+  }
+
+  /* ═══════════════ tables ═══════════════ */
+  table{width:100%;border-collapse:collapse;min-width:100%}
+  th{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--faint);font-weight:400;text-align:right;
+    padding:14px 14px;border-bottom:1px solid var(--rule-soft);white-space:nowrap;
+  }
+  th:first-child,td:first-child{text-align:left;padding-left:var(--pad)}
+  th:last-child,td:last-child{padding-right:var(--pad)}
+  td{
+    padding:16px 14px;text-align:right;border-bottom:1px solid var(--rule-soft);
+    font-family:var(--mono);font-size:clamp(12px,2.9vw,13px);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  /* Names read left. Only the first cell was being left-aligned, which
+     shoved every name column against the numbers to its right. */
+  th.who,td.who{text-align:left}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr{transition:background .14s ease}
+  tbody tr:hover{background:var(--paper)}
+  /* keep the leftmost column readable while wide tables scroll sideways */
+  th:first-child,td:first-child{position:sticky;left:0;background:var(--card);z-index:1}
+  tbody tr:hover td:first-child{background:var(--paper)}
+  td.pos{width:48px;color:var(--faint);font-size:12px}
+  tr.r1 td.pos{color:var(--gold);font-weight:500}
+  tr.r2 td.pos{color:var(--silver)}
+  tr.r3 td.pos{color:var(--bronze)}
+  tr.r1 td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+  tr.r2 td:first-child{box-shadow:inset 3px 0 0 var(--silver)}
+  tr.r3 td:first-child{box-shadow:inset 3px 0 0 var(--bronze)}
+  td.who{
+    font-family:var(--body);font-size:clamp(13.5px,3.3vw,14.5px);
+    font-weight:600;letter-spacing:-.01em;white-space:normal;
+    overflow-wrap:break-word;word-break:normal;hyphens:none;
+    min-width:8.5em;line-height:1.25;
+  }
+  td.pts{width:58px;font-size:clamp(15px,4vw,17px);font-weight:500}
+  td.dim{color:var(--faint)}
+  td.miss{color:var(--bronze)}
+  .flame{
+    color:var(--bronze);font-family:var(--mono);font-size:10px;
+    margin-left:6px;letter-spacing:.04em;white-space:nowrap;
+  }
+  tbody tr{animation:rowIn .4s ease both}
+  tbody tr:nth-child(1){animation-delay:.02s}
+  tbody tr:nth-child(2){animation-delay:.05s}
+  tbody tr:nth-child(3){animation-delay:.08s}
+  tbody tr:nth-child(4){animation-delay:.11s}
+  tbody tr:nth-child(5){animation-delay:.14s}
+  tbody tr:nth-child(6){animation-delay:.17s}
+  tbody tr:nth-child(7){animation-delay:.20s}
+  tbody tr:nth-child(8){animation-delay:.23s}
+  tbody tr:nth-child(9){animation-delay:.26s}
+  tbody tr:nth-child(n+10){animation-delay:.29s}
+  @keyframes rowIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+  /* ═══════════════ form strip ═══════════════ */
+  .strip{display:inline-flex;gap:3px;vertical-align:middle}
+  .sq{
+    width:clamp(7px,1.6vw,10px);height:clamp(15px,3.4vw,19px);
+    border-radius:2px;background:var(--miss);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+    transition:transform .14s ease;
+  }
+  .sq:hover{transform:scaleY(1.18)}
+  .sq.g{background:var(--gold)} .sq.s{background:var(--silver)}
+  .sq.b{background:var(--bronze)} .sq.p{background:var(--plain)}
+  .legend{
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+    padding:12px var(--pad);border-top:1px solid var(--rule-soft);
+    font-family:var(--mono);font-size:10px;color:var(--faint);
+    position:sticky;left:0;
+  }
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+  /* ═══════════════ heats ═══════════════ */
+  .heat{padding:17px var(--pad);border-bottom:1px solid var(--rule-soft)}
+  .heat:last-child{border-bottom:0}
+  .heat-day{
+    font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:8px;
+  }
+  .run{
+    display:inline-flex;align-items:baseline;gap:6px;
+    margin:0 8px 6px 0;padding:5px 10px;border-radius:999px;
+    background:var(--paper);border:1px solid var(--rule-soft);
+    transition:transform .14s ease,border-color .14s ease;
+  }
+  .run:hover{transform:translateY(-1px);border-color:var(--rule)}
+  .run b{font-weight:600;font-size:13px}
+  .run .t{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .run .p{font-family:var(--mono);font-size:11px;color:var(--indigo);font-weight:500}
+  .run.win{
+    background:linear-gradient(160deg, color-mix(in srgb, var(--gold) 18%, var(--card)), var(--card));
+    border-color:color-mix(in srgb, var(--gold) 40%, var(--rule-soft));
+  }
+  .run.win b{color:var(--gold)}
+  .run.dnp{opacity:.72}
+  .run.dnp b{color:var(--faint);font-weight:500}
+  .run.dnp .t{color:var(--faint);font-style:italic}
+
+  /* ═══════════════ states ═══════════════ */
+  .empty{padding:44px var(--pad);text-align:center;color:var(--muted);font-size:14px}
+  .empty strong{
+    display:block;font-family:var(--disp);font-size:20px;
+    color:var(--ink);margin-bottom:6px;letter-spacing:-.02em;
+  }
+  .warn{
+    background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--warn-ink);
+    box-shadow:var(--shadow-1);animation:panelIn .45s ease both;
+  }
+  .warn b{display:block;font-family:var(--disp);font-size:14.5px;margin-bottom:6px;color:var(--warn-strong)}
+  .warn ul{margin:0;padding-left:18px}
+  .warn li{margin-top:4px}
+  .warn code{
+    font-family:var(--mono);font-size:12px;background:var(--warn-code);
+    padding:1px 5px;border-radius:3px;overflow-wrap:anywhere;
+  }
+  .window{
+    display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;
+    margin:0 0 14px;padding:13px var(--pad);
+    background:linear-gradient(150deg, color-mix(in srgb, var(--indigo) 9%, var(--card)), var(--card) 70%);
+    border:1px solid var(--rule-soft);border-radius:var(--radius);
+    box-shadow:var(--shadow-1);
+    animation:panelIn .45s cubic-bezier(.16,.84,.35,1) both;
+  }
+  .window .wk{
+    font-family:var(--disp);font-weight:800;letter-spacing:-.025em;
+    font-size:clamp(19px,5vw,25px);color:var(--indigo);line-height:1.05;
+  }
+  .window .wr{
+    font-family:var(--mono);font-size:clamp(11px,2.9vw,12.5px);
+    color:var(--muted);letter-spacing:.02em;
+  }
+  .window .wd{
+    margin-left:auto;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+    white-space:nowrap;
+  }
+  @media (max-width:639px){ .window .wd{margin-left:0} }
+
+  .rules{
+    display:grid;gap:10px;margin:0 0 20px;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  }
+  .rule{
+    background:var(--card);border:1px solid var(--rule-soft);
+    border-left:3px solid var(--indigo);border-radius:10px;
+    padding:14px 16px;box-shadow:var(--shadow-1);
+  }
+  .rule.wide{grid-column:1/-1;border-left-color:var(--gold)}
+  .rule dt{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 6px;
+  }
+  .rule dd{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+  .rule dd.fine{margin-top:10px;font-size:12px;color:var(--faint)}
+  .curve{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+  .curve i{
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+    min-width:38px;padding:6px 4px 5px;border-radius:8px;font-style:normal;
+    background:var(--paper);border:1px solid var(--rule-soft);
+  }
+  .curve i b{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--ink)}
+  .curve i em{font-family:var(--mono);font-style:normal;font-size:8.5px;letter-spacing:.06em;color:var(--faint)}
+  .curve i:nth-child(1){background:color-mix(in srgb,var(--gold) 22%,var(--card));border-color:transparent}
+  .curve i:nth-child(2){background:color-mix(in srgb,var(--silver) 22%,var(--card));border-color:transparent}
+  .curve i:nth-child(3){background:color-mix(in srgb,var(--bronze) 20%,var(--card));border-color:transparent}
+  .foot{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);text-align:center;margin-top:24px;
+  }
+  .foot-note{
+    display:block;margin-top:6px;letter-spacing:.06em;
+    text-transform:none;font-size:11px;opacity:.85;
+  }
+
+  /* ═══════════════ in-view pickers ═══════════════ */
+  /* Player and game pickers wrap to a full grid instead of scrolling
+     sideways, so every name is visible without hunting. */
+  #view .chips{
+    flex-wrap:wrap;overflow:visible;
+    gap:7px;margin:0 0 16px;padding:0;
+    scroll-snap-type:none;
+  }
+  #view .chip{
+    text-transform:none;letter-spacing:.01em;
+    font-family:var(--body);font-size:clamp(12px,3vw,13px);font-weight:500;
+    padding:8px 13px;border-radius:10px;
+    transition:color .18s var(--ease),border-color .18s var(--ease),
+               background .18s var(--ease),transform .28s var(--spring),
+               box-shadow .28s var(--ease);
+  }
+  #view .chip[aria-pressed="true"]{
+    background:linear-gradient(160deg,var(--indigo-2),var(--indigo));
+    border-color:transparent;font-weight:600;
+    box-shadow:0 2px 5px -2px rgba(0,0,0,.3),
+               0 10px 22px -12px color-mix(in srgb, var(--indigo) 85%, transparent);
+  }
+
+  /* ═══════════════ texture and depth ═══════════════ */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.038;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  h1{
+    background:linear-gradient(100deg,var(--ink) 18%,var(--indigo) 46%,var(--ink) 78%);
+    background-size:230% 100%;background-position:0 0;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    transition:background-position .9s var(--ease);
+  }
+  .step{position:relative;overflow:hidden}
+  .step.p1::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(104deg,transparent 42%,
+      color-mix(in srgb, var(--gold) 26%, transparent) 50%,transparent 58%);
+    animation:sheen 7s var(--ease) infinite;
+  }
+  @keyframes sheen{0%,68%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+
+  /* ═══════════════ pointer interactions ═══════════════ */
+  @media (hover:hover) and (pointer:fine){
+    h1:hover{background-position:100% 0}
+    .panel{transition:box-shadow .3s var(--ease),border-color .3s var(--ease)}
+    .panel:hover{box-shadow:var(--shadow-2);border-color:var(--rule)}
+    .chip{transition:color .18s var(--ease),border-color .18s var(--ease),
+                     background .18s var(--ease),transform .3s var(--spring),
+                     box-shadow .3s var(--ease)}
+    .chip:hover{transform:translateY(-2px)}
+    #view .chip:hover{
+      border-color:color-mix(in srgb, var(--indigo) 45%, var(--rule));
+      box-shadow:0 8px 18px -12px color-mix(in srgb, var(--indigo) 80%, transparent);
+    }
+    .segmented button{transition:background .2s var(--ease),color .2s var(--ease),
+                                 box-shadow .2s var(--ease),transform .3s var(--spring)}
+    .segmented button:hover{transform:translateY(-1px)}
+    tbody tr:not(.r1):not(.r2):not(.r3):hover td:first-child{
+      box-shadow:inset 3px 0 0 color-mix(in srgb, var(--indigo) 55%, transparent);
+    }
+    .run{transition:transform .3s var(--spring),border-color .2s var(--ease),box-shadow .3s var(--ease)}
+    .run:hover{transform:translateY(-2px) rotate(-.5deg);box-shadow:var(--shadow-1)}
+    .kpi{transition:background .25s var(--ease)}
+    .kpi:hover{background:var(--paper)}
+    .sq{transition:transform .28s var(--spring)}
+    .sq:hover{transform:scale(1.35)}
+  }
+  :focus-visible{outline:3px solid var(--indigo-2);outline-offset:3px;border-radius:8px}
+
+  /* ═══════════════ standings emphasis ═══════════════ */
+  /* The leader's row should read as the headline, not just row one. */
+  /* A flat tint, not a gradient — a gradient on each td restarts per cell
+     and reads as vertical banding across the row. */
+  tr.r1 td,tr.r1 td:first-child{background:color-mix(in srgb,var(--gold) 9%,var(--card))}
+  tr.r1:hover td,tr.r1:hover td:first-child{background:color-mix(in srgb,var(--gold) 14%,var(--card))}
+  tr.r1 td.pts{font-size:clamp(17px,4.4vw,20px);font-weight:600;color:var(--gold)}
+  tr.r1 .nmw{font-size:1.04em}
+
+  /* Form squares deal themselves in, left to right. */
+  .strip .sq{animation:dealIn .4s var(--spring) both}
+  .strip .sq:nth-child(1){animation-delay:.04s}
+  .strip .sq:nth-child(2){animation-delay:.07s}
+  .strip .sq:nth-child(3){animation-delay:.10s}
+  .strip .sq:nth-child(4){animation-delay:.13s}
+  .strip .sq:nth-child(5){animation-delay:.16s}
+  .strip .sq:nth-child(6){animation-delay:.19s}
+  .strip .sq:nth-child(7){animation-delay:.22s}
+  .strip .sq:nth-child(n+8){animation-delay:.25s}
+  @keyframes dealIn{from{opacity:0;transform:translateY(4px) scaleY(.55)}to{opacity:1;transform:none}}
+
+  @media (hover:hover) and (pointer:fine){
+    .pip{transition:transform .3s var(--spring),box-shadow .3s var(--ease)}
+    tbody tr:hover .pip{transform:scaleY(1.28);box-shadow:0 0 0 1px var(--c),0 5px 14px -3px var(--c)}
+    .med i{transition:transform .28s var(--spring)}
+    .med i:hover{transform:translateY(-2px) scale(1.08)}
+    .step{transition:transform .35s var(--spring)}
+    .step:hover{transform:translateY(-3px)}
+    .step:hover .crest{box-shadow:0 7px 20px -4px var(--c)}
+    .badge{transition:transform .3s var(--spring),border-color .2s var(--ease)}
+    .badge:hover{transform:translateY(-2px)}
+  }
+
+  /* ═══════════════ phones ═══════════════ */
+  @media (max-width:639px){
+    .hide-s{display:none}
+    /* nav stays reachable while long tables scroll past */
+    .segmented{
+      position:sticky;top:0;z-index:20;margin-inline:calc(var(--pad) * -0.5);
+      background:color-mix(in srgb, var(--board) 88%, transparent);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    }
+    .segmented{margin-bottom:0}
+    .chips{
+      position:sticky;top:52px;z-index:19;margin-top:0;
+      padding-block:8px;margin-inline:calc(var(--pad) * -0.5);
+      padding-inline:calc(var(--pad) * 0.5);
+      background:color-mix(in srgb, var(--board) 88%, transparent);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    }
+    th,td{padding:13px 8px}
+    .run{margin-right:6px}
+    #view .chips{position:static;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+      padding:0;margin-inline:0;gap:6px}
+    #view .chip{padding:8px 11px;min-height:36px}
+    .step .nm{font-size:clamp(12px,3.3vw,15px);letter-spacing:-.025em}
+    .step.p1 .nm{font-size:clamp(15px,4.3vw,21px)}
+    td.who{min-width:7.5em}
+  }
+
+  /* ═══════════════ tablets ═══════════════ */
+  @media (min-width:640px) and (max-width:1023px){
+    .wrap{max-width:700px}
+    .podium{grid-template-columns:1fr 1.25fr 1fr}
+    .step.p1{padding-top:36px;padding-bottom:30px}
+    .step.p2{padding-top:26px}
+  }
+
+  /* ═══════════════ laptops and up ═══════════════ */
+  @media (min-width:1024px){
+    .wrap{
+      max-width:1240px;
+      display:grid;
+      grid-template-columns:290px minmax(0,1fr);
+      grid-template-rows:auto auto auto auto auto auto auto 1fr auto;
+      column-gap:clamp(32px,4vw,56px);
+      align-content:start;
+      padding-top:44px;
+    }
+    .eyebrow  {grid-column:1;grid-row:1;margin-bottom:14px}
+    h1        {grid-column:1;grid-row:2;font-size:clamp(46px,4.4vw,62px)}
+    .tagline  {grid-column:1;grid-row:3;margin-bottom:14px}
+    .rules    {grid-column:1;grid-row:4;margin-bottom:22px;grid-template-columns:1fr}
+    #views    {grid-column:1;grid-row:5;flex-direction:column;gap:2px;margin-bottom:18px}
+    #periods  {grid-column:1;grid-row:6;flex-wrap:wrap;overflow:visible}
+    #warnings {grid-column:2;grid-row:1}
+    #tools    {grid-column:1;grid-row:7;margin-top:16px}
+    #view     {grid-column:2;grid-row:2 / span 7;align-self:start}
+    .foot     {grid-column:1;grid-row:8;text-align:left;margin-top:26px;align-self:end}
+
+    #views button{text-align:left;flex:1 1 auto;padding:11px 14px}
+    .panel{margin-bottom:18px}
+    .panel:hover{box-shadow:var(--shadow-2)}
+    .panel{transition:box-shadow .25s ease}
+    .step.p1{padding-top:42px;padding-bottom:34px}
+    .step.p2{padding-top:30px}
+    td{padding:13px 10px}
+    .sq{width:11px;height:21px}
+  }
+
+  @media (min-width:1400px){
+    .wrap{max-width:1340px;grid-template-columns:320px minmax(0,1fr)}
+  }
+
+  /* ═══════════════ preferences ═══════════════ */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms !important;animation-delay:0s !important;transition-duration:.001ms !important}
+    html{scroll-behavior:auto}
+  }
+  @media print{
+    body{background:#fff;color:#000}
+    body::before{display:none}
+    .segmented,.chips,.tools,#modal,#toast,.wbtn{display:none}
+    .panel{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
+  }
+  /* ═══════════════ monograms ═══════════════ */
+  .step .crest + .nm{margin-top:8px}
+  .pip{
+    display:inline-block;vertical-align:middle;
+    width:4px;height:19px;margin-right:9px;border-radius:99px;
+    background:var(--c);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent),
+               0 3px 9px -3px var(--c);
+  }
+  .crest{
+    display:block;width:clamp(30px,7vw,44px);height:5px;border-radius:99px;
+    background:var(--c);margin:12px auto 0;
+    box-shadow:0 4px 12px -4px var(--c);
+  }
+  .step.p1 .crest{width:clamp(40px,9vw,60px);height:6px}
+  /* A td must stay a table cell — display:flex takes it out of the column
+     model and lets rows size independently, which is what threw the
+     standings rows out of line. */
+  td.who{vertical-align:middle}
+  td.who .nmw{display:inline-block;vertical-align:middle;min-width:0}
+  .title{
+    color:var(--gold);font-family:var(--mono);font-size:10px;
+    margin-left:6px;font-weight:500;letter-spacing:.02em;
+  }
+
+  /* ═══════════════ movement, medals, form ═══════════════ */
+  .mv{display:block;font-family:var(--mono);font-size:9.5px;margin-top:2px;letter-spacing:0}
+  .mv.up{color:#2E9E6B} .mv.down{color:#C4553F} .mv.flat{color:var(--miss)}
+  .med{display:inline-flex;gap:6px;justify-content:flex-end}
+  .med i{
+    font-style:normal;font-family:var(--mono);font-size:10.5px;font-weight:500;
+    min-width:20px;padding:2px 5px;border-radius:5px;color:var(--ink);
+  }
+  .med i.g{background:color-mix(in srgb,var(--gold) 30%,transparent)}
+  .med i.s{background:color-mix(in srgb,var(--silver) 28%,transparent)}
+  .med i.b{background:color-mix(in srgb,var(--bronze) 26%,transparent)}
+  .form{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  .form i{font-style:normal;font-size:9px;margin-left:3px}
+  .form.up{color:#2E9E6B} .form.down{color:#C4553F} .form.flat{color:var(--faint)}
+  td.pts small,td.dim small{
+    display:block;font-family:var(--mono);font-size:9.5px;
+    color:var(--faint);font-weight:400;margin-top:1px;
+  }
+  td.hot{color:var(--indigo);font-weight:500;background:var(--indigo-soft)}
+  .rec{
+    font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;font-weight:500;
+    color:var(--gold);margin-left:5px;vertical-align:1px;
+  }
+  .sq.q{background:var(--plain);opacity:.42}
+  .legend .note{flex-basis:100%;color:var(--faint);opacity:.85;line-height:1.5;font-size:9.5px}
+
+  /* ═══════════════ week navigation ═══════════════ */
+  .window .nav{display:inline-flex;gap:4px;margin-right:2px}
+  .wbtn{
+    width:30px;height:30px;border-radius:8px;border:1px solid var(--rule);
+    background:var(--card);color:var(--muted);font-size:10px;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;
+    transition:color .16s,border-color .16s,transform .16s;
+  }
+  .wbtn:hover:not(:disabled){color:var(--indigo);border-color:var(--indigo);transform:translateY(-1px)}
+  .wbtn:disabled{opacity:.32;cursor:default}
+
+  /* ═══════════════ the race chart ═══════════════ */
+  .chart{padding:16px var(--pad) 4px}
+  .chart svg{width:100%;height:auto;display:block;overflow:visible}
+  .chart .gl{stroke:var(--rule-soft);stroke-width:1}
+  .chart .ga{fill:var(--faint);font-family:var(--mono);font-size:9px}
+  .keys{
+    display:flex;flex-wrap:wrap;gap:6px 10px;padding:6px var(--pad) 15px;
+    position:sticky;left:0;
+  }
+  .key{
+    font-family:var(--body);font-size:11.5px;color:var(--muted);
+    display:inline-flex;align-items:center;gap:5px;
+  }
+  .key::before{content:"";width:12px;height:3px;border-radius:2px;background:var(--c)}
+
+  /* ═══════════════ fact pairs ═══════════════ */
+  .facts{display:grid;gap:1px;background:var(--rule-soft);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .fact{background:var(--card);padding:15px var(--pad)}
+  .fact dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+  .fact dd{margin:5px 0 3px;font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:-.02em}
+  .fact p{margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+
+  /* ═══════════════ bench ═══════════════ */
+  .benchlist{display:flex;flex-wrap:wrap;gap:8px;padding:14px var(--pad)}
+  .ghost{
+    display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 5px;
+    border-radius:999px;border:1px dashed var(--rule);
+    font-size:12.5px;color:var(--faint);
+  }
+  .ghost .pip{opacity:.55;height:14px;margin-right:0}
+
+  /* ═══════════════ badges ═══════════════ */
+  .badges{display:flex;flex-wrap:wrap;gap:8px;padding:14px var(--pad);border-top:1px solid var(--rule-soft)}
+  .badge{
+    display:inline-flex;flex-direction:column;gap:1px;
+    padding:8px 13px;border-radius:10px;font-size:12.5px;
+    background:var(--paper);border:1px solid var(--rule-soft);
+  }
+  .badge b{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:500;color:var(--faint)}
+  .badge.good{border-left:3px solid #2E9E6B}
+  .badge.bad{border-left:3px solid #C4553F}
+  .badge.gold{border-left:3px solid var(--gold)}
+
+  /* ═══════════════ records ═══════════════ */
+  .recs{display:flex;flex-direction:column}
+  .rec-row{
+    display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;
+    padding:12px var(--pad);border-bottom:1px solid var(--rule-soft);
+  }
+  .rec-row:last-child{border-bottom:0}
+  .rec-row .rg{font-weight:600;font-size:13.5px}
+  .rec-row .rt{font-family:var(--mono);font-size:16px;color:var(--gold);text-align:right}
+  .rec-row .rh{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .rec-row .rh .pip{height:15px;margin-right:0}
+  .rec-row .rd{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:right}
+
+  /* ═══════════════ head to head ═══════════════ */
+  .duelpick{display:grid;gap:12px;margin-bottom:16px}
+  .side-l{
+    display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:7px;
+  }
+  #view .duelpick .chips{margin-bottom:0}
+  #view .chip:disabled{opacity:.3;cursor:default}
+  .duelhead{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;
+    padding:18px var(--pad) 14px;
+  }
+  .dp{display:flex;align-items:center;gap:9px;min-width:0}
+  .dp.right{justify-content:flex-end}
+  .dp b{font-family:var(--disp);font-size:clamp(14px,3.8vw,18px);letter-spacing:-.02em;line-height:1.15}
+  .dvs{font-family:var(--mono);font-size:clamp(17px,4.6vw,22px);color:var(--muted);white-space:nowrap}
+  .h2hbar{display:flex;height:26px;margin:0 var(--pad) 16px;border-radius:7px;overflow:hidden;gap:2px}
+  .h2hbar span{
+    display:flex;align-items:center;justify-content:center;color:#fff;
+    font-family:var(--mono);font-size:11.5px;min-width:0;
+  }
+  .h2hbar .dr{background:var(--miss);color:var(--muted)}
+  .duels{display:flex;flex-direction:column}
+  .duel{
+    display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;
+    padding:11px var(--pad);border-bottom:1px solid var(--rule-soft);
+  }
+  .duel:last-child{border-bottom:0}
+  .duel .dg{font-size:12.5px;color:var(--muted)}
+  .duel .dt{font-family:var(--mono);font-size:13px;color:var(--faint)}
+  .duel .dt.w{color:var(--ink);font-weight:500}
+  .duel .dv{font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+  /* ═══════════════ roll of honour ═══════════════ */
+  .crowns{display:flex;flex-wrap:wrap;gap:9px;padding:14px var(--pad)}
+  .crown{
+    display:inline-flex;align-items:center;gap:8px;padding:6px 13px 6px 6px;
+    border-radius:999px;background:var(--paper);border:1px solid var(--rule-soft);font-size:13px;font-weight:500;
+  }
+  .crown b{color:var(--gold);font-size:11px;letter-spacing:.06em}
+  tr.live td{background:color-mix(in srgb,var(--indigo) 5%,var(--card))}
+  tr.live td:first-child{background:color-mix(in srgb,var(--indigo) 5%,var(--card))}
+
+  /* ═══════════════ tools ═══════════════ */
+  .tools{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .tool{
+    border:1px solid var(--rule);background:var(--paper);color:var(--muted);
+    border-radius:10px;padding:9px 14px;min-height:38px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    transition:color .18s,border-color .18s,transform .2s,box-shadow .2s;
+  }
+  .tool:hover{color:var(--indigo);border-color:var(--indigo);transform:translateY(-1px);box-shadow:var(--shadow-1)}
+  .tool:active{transform:scale(.97)}
+
+  /* ═══════════════ share sheet ═══════════════ */
+  #modal{
+    position:fixed;inset:0;z-index:80;display:none;
+    align-items:center;justify-content:center;padding:16px;
+    background:color-mix(in srgb,#080B14 72%,transparent);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  #modal.on{display:flex}
+  .sheet{
+    background:var(--card);border:1px solid var(--rule);border-radius:18px;
+    max-width:460px;width:100%;max-height:92dvh;overflow:auto;
+    box-shadow:var(--shadow-2);animation:panelIn .3s var(--ease) both;
+  }
+  .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px var(--pad);border-bottom:1px solid var(--rule-soft);
+    position:sticky;top:0;background:var(--card);z-index:2;
+  }
+  .x{border:0;background:transparent;color:var(--muted);font-size:15px;padding:4px 6px;border-radius:6px}
+  .x:hover{color:var(--ink);background:var(--paper)}
+  .shot{padding:16px var(--pad);background:var(--paper)}
+  .shot canvas{width:100%;height:auto;display:block;border-radius:12px;box-shadow:var(--shadow-2)}
+  .sheet-foot{display:flex;gap:8px;padding:14px var(--pad) 4px;flex-wrap:wrap}
+  .act{
+    flex:1 1 auto;border:0;border-radius:10px;padding:12px 16px;min-height:44px;
+    background:linear-gradient(160deg,var(--indigo-2),var(--indigo));color:var(--on-indigo);
+    font-size:13.5px;font-weight:600;transition:transform .18s,box-shadow .18s;
+  }
+  .act.ghost{background:var(--paper);color:var(--muted);border:1px solid var(--rule)}
+  .act:hover{transform:translateY(-1px);box-shadow:var(--shadow-1)}
+  .hint{margin:0;padding:8px var(--pad) 18px;font-size:11.5px;color:var(--faint);text-align:center}
+
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
+    z-index:90;opacity:0;pointer-events:none;
+    background:var(--ink);color:var(--board);border-radius:999px;
+    padding:11px 20px;font-size:13px;font-weight:500;box-shadow:var(--shadow-2);
+    transition:opacity .22s var(--ease),transform .22s var(--ease);
+  }
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media (min-width:640px){
+    .duelpick{grid-template-columns:1fr 1fr;gap:18px}
+  }
+  @media (max-width:639px){
+    .pip{height:16px;margin-right:7px}
+    .med i{min-width:18px;padding:2px 4px;font-size:10px}
+    .rec-row{grid-template-columns:1fr auto}
+  }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">LinkedIn Games · daily league</div>
+  <h1 id="title">The Daily League</h1>
+  <p class="tagline" id="tagline"></p>
+  <div class="rules" id="rules"></div>
+
+  <div id="warnings"></div>
+  <div class="segmented" id="views"></div>
+  <div class="chips" id="periods"></div>
+  <div class="tools" id="tools"></div>
+  <div id="view"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<div id="modal"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ─────────────────────────── parsing ─────────────────────────── */
+const WARN = [];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYNAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad2 = n => String(n).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+const today = () => ymd(new Date());
+const parseYmd = s => { const p = s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); };
+const prettyDate = s => { const d = parseYmd(s); return DAYNAMES[d.getDay()]+' '+d.getDate()+' '+MONTHS[d.getMonth()]; };
+const shortDate = s => { const d = parseYmd(s); return d.getDate()+' '+MONTHS[d.getMonth()]; };
+const mondayOf = s => { const d = parseYmd(s); d.setDate(d.getDate() - ((d.getDay()+6) % 7)); return ymd(d); };
+const addDays = (s,n) => { const d = parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
+const weeksBetween = (a,b) => Math.round((parseYmd(b) - parseYmd(a)) / 604800000);
+const fmtTime = s => s >= 3600
+  ? Math.floor(s/3600)+':'+pad2(Math.floor(s%3600/60))+':'+pad2(Math.round(s%60))
+  : Math.floor(s/60)+':'+pad2(Math.round(s%60));
+
+const avgOf  = r => r.plays ? fmtTime(Math.round(r.time / r.plays)) : '—';
+const bestOf = r => r.plays ? fmtTime(r.best) : '—';
+
+const splitList = block => String(block).split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+
+const ROSTER = splitList(NAMES);
+const GAMELIST = splitList(GAMES);
+const keyOf = s => s.trim().toLowerCase();
+const NAME_KEYS = new Map(ROSTER.map(n => [keyOf(n), n]));
+const GAME_KEYS = new Map(GAMELIST.map(g => [keyOf(g), g]));
+
+function readDate(raw){
+  const s = raw.trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m) return m[1]+'-'+pad2(m[2])+'-'+pad2(m[3]);
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(m) return m[3]+'-'+pad2(m[2])+'-'+pad2(m[1]);   // day first
+  return null;
+}
+
+function readTime(raw){
+  const s = raw.trim();
+  if(!/^\d+(:\d{1,2}){0,2}(\.\d+)?$/.test(s)) return 0;
+  const parts = s.split(':').map(Number);
+  if(parts.some(isNaN)) return 0;
+  if(parts.length === 1) return Math.round(parts[0]);
+  if(parts.length === 2) return Math.round(parts[0]*60 + parts[1]);
+  return Math.round(parts[0]*3600 + parts[1]*60 + parts[2]);
+}
+
+/* Ways of saying "didn't play". A bare name works too. */
+const SKIPS = new Set(['x','×','dnp','dna','dnf','skip','skipped','miss','missed',
+                       'na','n/a','none','nil','absent','0','0:00','00:00','—','–']);
+const isSkipToken = t => SKIPS.has(t.toLowerCase()) || /^-+$/.test(t);
+
+function parseLog(){
+  const runs = [];
+  const strayNames = new Set(), strayGames = new Set();
+
+  String(LOG).split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if(!line || line.startsWith('#')) return;
+    const bits = line.split('|');
+    if(bits.length < 3){
+      WARN.push(`Line ${i+1} doesn't have three parts separated by <code>|</code> — skipped.`);
+      return;
+    }
+    const date = readDate(bits[0]);
+    if(!date){ WARN.push(`Line ${i+1}: <code>${esc(bits[0].trim())}</code> isn't a date I can read. Use 2026-08-18.`); return; }
+
+    const gk = keyOf(bits[1]);
+    if(!GAME_KEYS.has(gk)){ strayGames.add(bits[1].trim()); return; }
+    const game = GAME_KEYS.get(gk);
+
+    bits.slice(2).join('|').split(',').forEach(chunk => {
+      const c = chunk.trim();
+      if(!c) return;
+      const m = c.match(/^(.*?)\s+(\S+)$/);
+      let who, secs;
+
+      if(m && readTime(m[2]) > 0){                 // Name 1:23
+        who = m[1].trim(); secs = readTime(m[2]);
+      } else if(m && isSkipToken(m[2])){           // Name -
+        who = m[1].trim(); secs = null;
+      } else {                                     // bare name — didn't play
+        who = c; secs = null;
+      }
+
+      const nk = keyOf(who);
+      if(!NAME_KEYS.has(nk)){
+        if(m && NAME_KEYS.has(keyOf(m[1]))){
+          WARN.push(`Line ${i+1}: <code>${esc(m[2])}</code> isn't a time I can read. Use <code>1:23</code>, or leave it off for a miss.`);
+        } else {
+          strayNames.add(who);
+        }
+        return;
+      }
+      runs.push({ date, game, player: NAME_KEYS.get(nk), seconds: secs });
+    });
+  });
+
+  if(strayNames.size) WARN.push(`Not on the roster, so ignored: <code>${[...strayNames].map(esc).join('</code>, <code>')}</code>. Add them to NAMES or fix the spelling.`);
+  if(strayGames.size) WARN.push(`Not in the games list, so ignored: <code>${[...strayGames].map(esc).join('</code>, <code>')}</code>. Add them to GAMES or fix the spelling.`);
+  return runs;
+}
+
+/* ─────────────────────────── scoring ─────────────────────────── */
+/* One heat = one game on one day. Fastest takes 10, then 9 … 1 for tenth.
+   Equal times share a position and its points; the next runner drops by
+   however many were tied. Every run also carries a `ratio` — how many
+   times slower than the fastest solve of that heat it was. That is the
+   only fair way to compare a Queens time with a Mini Sudoku time. */
+const pointsFor = rank => POINTS[rank - 1] || 0;
+
+function scoreRuns(runs){
+  const heats = {};
+  runs.forEach(r => { const k = r.date+'|'+r.game; (heats[k] = heats[k] || []).push(r); });
+  const out = [];
+  Object.values(heats).forEach(list => {
+    list.filter(r => r.seconds === null)
+        .forEach(r => out.push(Object.assign({}, r, { rank:null, points:0, missed:true, ratio:null })));
+    const sorted = list.filter(r => r.seconds !== null).sort((a,b) => a.seconds - b.seconds);
+    const lead = sorted.length ? Math.max(1, sorted[0].seconds) : 1;
+    let rank = 0, seen = 0, prev = null;
+    sorted.forEach(r => {
+      seen++;
+      if(r.seconds !== prev){ rank = seen; prev = r.seconds; }
+      out.push(Object.assign({}, r, {
+        rank, points: pointsFor(rank), missed:false,
+        ratio: Math.max(1, r.seconds) / lead, field: sorted.length
+      }));
+    });
+  });
+  return out;
+}
+
+function tally(rows){
+  const t = {};
+  rows.forEach(r => {
+    const x = t[r.player] || (t[r.player] = { player:r.player, pts:0, plays:0, missed:0, wins:0,
+      top3:0, time:0, best:Infinity, g:0, s:0, b:0, ratios:[], ranks:[] });
+    if(r.missed){ x.missed++; return; }
+    x.pts += r.points; x.plays++; x.time += r.seconds;
+    x.ratios.push(r.ratio); x.ranks.push(r.rank);
+    if(r.rank === 1){ x.wins++; x.g++; } else if(r.rank === 2) x.s++; else if(r.rank === 3) x.b++;
+    if(r.rank <= 3) x.top3++;
+    if(r.seconds < x.best) x.best = r.seconds;
+  });
+  const list = Object.values(t).sort((a,b) =>
+    b.pts - a.pts || b.wins - a.wins || a.time - b.time || a.player.localeCompare(b.player));
+  list.forEach((r,i) => {
+    r.rank = (i && list[i-1].pts === r.pts && list[i-1].wins === r.wins) ? list[i-1].rank : i+1;
+    r.pace = median(r.ratios);
+    r.med  = median(r.ranks);
+    r.vol  = spread(r.ranks);
+  });
+  return list;
+}
+
+const median = a => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1;
+  return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
+const spread = a => { if(a.length < 2) return null; const m = a.reduce((x,y)=>x+y,0)/a.length;
+  return Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/a.length); };
+
+const RUNS = scoreRuns(parseLog());
+const DAYS = [...new Set(RUNS.map(r => r.date))].sort();
+
+/* who topped each day, and what each player took from it */
+const DAYRANK = {}, DAYPTS = {};
+DAYS.forEach(d => {
+  DAYRANK[d] = {}; DAYPTS[d] = {};
+  tally(RUNS.filter(r => r.date === d)).forEach(r => {
+    DAYRANK[d][r.player] = r.pts > 0 ? r.rank : 0;
+    DAYPTS[d][r.player] = r.pts;
+  });
+});
+
+function streakOf(player){
+  let n = 0;
+  for(let i = DAYS.length - 1; i >= 0; i--){
+    if(DAYRANK[DAYS[i]][player] === 1) n++; else break;
+  }
+  return n;
+}
+
+/* ───────────────────── identity: colour ───────────────────── */
+/* A stable hue per name, spaced by the golden angle so neighbours in the
+   roster don't come out looking alike. The colour is carried by a slim
+   pip rather than an initialled disc — quieter, and it never collides
+   when two players share initials. */
+function hueOf(name){
+  let h = 0;
+  for(let i = 0; i < name.length; i++) h = (h * 33 + name.charCodeAt(i)) >>> 0;
+  return Math.round((h % 1000) * 137.508) % 360;
+}
+const colorOf = n => `hsl(${hueOf(n)} 62% 52%)`;
+const softOf  = n => `hsl(${hueOf(n)} 62% 52% / .14)`;
+const mono = n => `<span class="pip" style="--c:${colorOf(n)}"></span>`;
+
+/* ─────────────────────────── state ─────────────────────────── */
+const PERIODS = [['W','Week'],['M','This month'],['Y','This year'],['A','All time']];
+const VIEWS = [['board','Standings'],['games','Games'],['players','Players'],
+               ['h2h','Head to head'],['season','Season']];
+const STRIP = 14;
+let ui = { view:'board', period:'W', game:'ALL', player:'', p1:'', p2:'', weekMon:'' };
+
+/* Week #1 starts on SEASON_START, or on the Monday of the first logged day. */
+const SEASON_MON = mondayOf(SEASON_START || (DAYS[0] || today()));
+const weekNo = mon => weeksBetween(SEASON_MON, mon) + 1;
+
+/* Every Monday that has results behind it, oldest first. The week shown is
+   navigable — a finished week never disappears just because a new one began. */
+const MONDAYS = [...new Set(DAYS.map(mondayOf))].sort();
+const THIS_MON = mondayOf(today());
+ui.weekMon = MONDAYS.includes(THIS_MON) ? THIS_MON
+           : (MONDAYS.length ? MONDAYS[MONDAYS.length-1] : THIS_MON);
+
+const weekRows  = mon => RUNS.filter(r => mondayOf(r.date) === mon);
+const weekDays  = mon => DAYS.filter(d => mondayOf(d) === mon);
+const weekDone  = mon => weekDays(mon).length >= 7 || addDays(mon,6) < today();
+
+function inPeriod(p){
+  if(p === 'A') return () => true;
+  const t = today();
+  if(p === 'M') return r => r.date.slice(0,7) === t.slice(0,7);
+  if(p === 'Y') return r => r.date.slice(0,4) === t.slice(0,4);
+  return r => mondayOf(r.date) === ui.weekMon;
+}
+/* Which days the form strip should cover: the chosen week, or a rolling
+   fortnight for the longer views. */
+const stripDays = () => ui.period === 'W' ? weekDays(ui.weekMon) : DAYS.slice(-STRIP);
+
+/* ───────────────────── week-over-week movement ───────────────────── */
+function rankMapFor(mon){
+  const m = {};
+  if(!mon) return m;
+  tally(weekRows(mon)).forEach(r => { if(r.plays) m[r.player] = r.rank; });
+  return m;
+}
+function movementFor(mon){
+  const i = MONDAYS.indexOf(mon);
+  if(i < 1) return null;
+  const now = rankMapFor(mon), was = rankMapFor(MONDAYS[i-1]);
+  const out = {};
+  Object.keys(now).forEach(p => { if(was[p] != null) out[p] = was[p] - now[p]; });
+  return out;
+}
+
+/* ───────────────────── weekly champions ledger ───────────────────── */
+const LEDGER = MONDAYS.map(mon => {
+  const t = tally(weekRows(mon)).filter(r => r.plays);
+  const runner = t.find(r => r.rank > 1);
+  return {
+    mon, no: weekNo(mon), days: weekDays(mon).length, done: weekDone(mon),
+    champ: t[0] || null, runner: runner || null,
+    margin: t[0] && runner ? t[0].pts - runner.pts : null,
+    third: t.find(r => r.rank > 2 && (!runner || r.player !== runner.player)) || null
+  };
+});
+const TITLES = {};
+LEDGER.filter(w => w.done && w.champ).forEach(w => { TITLES[w.champ.player] = (TITLES[w.champ.player]||0) + 1; });
+
+/* ───────────────────── course records ───────────────────── */
+/* The fastest solve ever logged for each game, and who holds it. */
+const RECORDS = GAMELIST.map(g => {
+  const rs = RUNS.filter(r => r.game === g && !r.missed);
+  if(!rs.length) return null;
+  const best = rs.reduce((a,r) => r.seconds < a.seconds ? r : a);
+  const fresh = rs.filter(r => r.seconds === best.seconds);
+  return { game:g, seconds:best.seconds, date:best.date,
+           holders:[...new Set(fresh.map(r => r.player))] };
+}).filter(Boolean);
+
+/* ───────────────────── specialist and nemesis ───────────────────── */
+/* Best and worst game by average finishing position, over whatever
+   stretch is on screen. Two plays minimum, or it's noise. */
+function gameProfile(player, rows){
+  const by = {};
+  rows.filter(r => r.player === player && !r.missed).forEach(r => (by[r.game] = by[r.game] || []).push(r.rank));
+  const list = Object.entries(by).filter(([,v]) => v.length >= 2)
+    .map(([g,v]) => ({ game:g, avg: v.reduce((a,b)=>a+b,0)/v.length, n:v.length }))
+    .sort((a,b) => a.avg - b.avg);
+  if(list.length < 2) return null;
+  return { best:list[0], worst:list[list.length-1] };
+}
+
+/* ───────────────────── form ───────────────────── */
+/* Points per day across the last three scored days, against the same
+   player's average for the whole stretch. */
+function formOf(player, rows, days){
+  const last = days.slice(-3);
+  if(last.length < 2 || days.length < 3) return null;
+  const recent = last.reduce((a,d) => a + (DAYPTS[d] && DAYPTS[d][player] || 0), 0) / last.length;
+  const all = days.reduce((a,d) => a + (DAYPTS[d] && DAYPTS[d][player] || 0), 0) / days.length;
+  return { recent, delta: all ? (recent - all) / all : 0 };
+}
+
+/* ───────────────────── heats worth talking about ───────────────────── */
+function heatExtremes(rows){
+  const heats = {};
+  rows.filter(r => !r.missed).forEach(r => (heats[r.date+'|'+r.game] = heats[r.date+'|'+r.game] || []).push(r));
+  let closest = null, widest = null;
+  Object.values(heats).forEach(list => {
+    if(list.length < 2) return;
+    const s = [...list].sort((a,b) => a.seconds - b.seconds);
+    const gap = s[1].seconds - s[0].seconds;
+    const span = s[s.length-1].seconds - s[0].seconds;
+    if(!closest || gap < closest.gap) closest = { gap, first:s[0], second:s[1] };
+    if(!widest  || span > widest.span) widest  = { span, first:s[0], last:s[s.length-1] };
+  });
+  return { closest, widest };
+}
+
+/* ─────────────────────────── pieces ─────────────────────────── */
+const suffix = n => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+
+/* The rules read straight off POINTS, so the panel can never describe a
+   curve the site isn't actually using. */
+function rulesPanel(){
+  const curve = POINTS.map((p,i) =>
+    `<i title="${i+1}${suffix(i+1)} fastest"><b>${p}</b><em>${i+1}${suffix(i+1)}</em></i>`).join('');
+  return `
+    <div class="rule wide">
+      <dt>How points work</dt>
+      <dd>Every game, every day, is its own race. The clock sets the order.</dd>
+      <div class="curve">${curve}</div>
+      <dd class="fine">Outside the top ${POINTS.length}, or sitting the game out: nothing.
+        Identical times share the position and its points, and the next player drops by however many were level.</dd>
+    </div>
+    <div class="rule">
+      <dt>The week</dt>
+      <dd>Monday to Sunday. The weekly table clears every Monday. Month, year and all-time keep running.</dd>
+    </div>
+    <div class="rule">
+      <dt>When it updates</dt>
+      <dd>Each day's puzzles are scored the day after, once they expire — so today never appears until tomorrow.</dd>
+    </div>`;
+}
+
+/* Form strip. Banded by where they finished, not just whether they scored:
+   gold / silver / bronze, then a strong tint for 4th–6th and a faint one
+   for anything below. */
+function stripFor(player, days){
+  days = days || stripDays();
+  return `<span class="strip">${days.map(d => {
+    const pos = (DAYRANK[d] || {})[player] || 0;
+    const cls = pos === 1 ? 'g' : pos === 2 ? 's' : pos === 3 ? 'b'
+              : pos && pos <= 6 ? 'p' : pos ? 'q' : '';
+    return `<span class="sq ${cls}" title="${prettyDate(d)} — ${pos ? pos + suffix(pos) : 'nothing'}"></span>`;
+  }).join('')}</span>`;
+}
+
+function medals(r){
+  if(!(r.g + r.s + r.b)) return '<span class="dim">—</span>';
+  return `<span class="med">${
+    (r.g ? `<i class="g" title="${r.g} first">${r.g}</i>` : '') +
+    (r.s ? `<i class="s" title="${r.s} second">${r.s}</i>` : '') +
+    (r.b ? `<i class="b" title="${r.b} third">${r.b}</i>` : '')}</span>`;
+}
+
+function moveCell(mv, player){
+  if(!mv || mv[player] == null) return '<span class="mv flat">·</span>';
+  const d = mv[player];
+  if(!d) return '<span class="mv flat">—</span>';
+  return `<span class="mv ${d > 0 ? 'up' : 'down'}" title="${Math.abs(d)} place${Math.abs(d)>1?'s':''} ${d>0?'up on':'down from'} last week">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
+}
+
+function formCell(f){
+  if(!f) return '<span class="dim">—</span>';
+  const cls = f.delta > .06 ? 'up' : f.delta < -.06 ? 'down' : 'flat';
+  return `<span class="form ${cls}">${Math.round(f.recent)}<i>${
+    f.delta > .06 ? '▲' : f.delta < -.06 ? '▼' : '='}</i></span>`;
+}
+
+const paceCell = r => r.pace ? `${r.pace.toFixed(1)}&times;` : '—';
+
+function podium(table){
+  const order = [table[1], table[0], table[2]];
+  const cls = ['p2','p1','p3'], med = ['SECOND','FIRST','THIRD'];
+  return `<div class="panel"><div class="podium">${order.map((r,i) => `
+    <div class="step ${r ? cls[i] : ''}">
+      <div class="medal">${med[i]}</div>
+      ${r ? `<span class="crest" style="--c:${colorOf(r.player)}"></span>` : ''}
+      <div class="nm">${r ? esc(r.player) : '—'}</div>
+      <div class="pt">${r ? '<b>'+r.pts+'</b> pts' : 'unclaimed'}</div>
+    </div>`).join('')}</div></div>`;
+}
+
+function emptyPanel(msg){
+  const latest = DAYS.length ? DAYS[DAYS.length-1] : null;
+  return `<div class="panel"><div class="empty"><strong>Nothing scored yet</strong>${msg}${
+    latest ? ` Latest results are from ${prettyDate(latest)}.` : ''}</div></div>`;
+}
+
+/* ───────────────────── the race chart ─────────────────────
+   Cumulative points, day by day. This is the one picture that turns a
+   table into a contest — you can see a lead being built or eaten into. */
+function raceChart(rows, days){
+  if(days.length < 2) return '';
+  const table = tally(rows).filter(r => r.plays);
+  if(table.length < 2) return '';
+  const shown = table.slice(0, 8);
+
+  const W = 480, H = 268, L = 34, R = 12, T = 16, B = 30;
+  const top = Math.max(1, shown[0].pts);
+  const x = i => L + i * (W - L - R) / (days.length - 1);
+  const y = v => H - B - (v / top) * (H - T - B);
+
+  const gridV = [0, .25, .5, .75, 1].map(f => {
+    const v = Math.round(top * f);
+    return `<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" class="gl"/>
+            <text x="${L-6}" y="${y(v)+3}" class="ga" text-anchor="end">${v}</text>`;
+  }).join('');
+
+  const xa = days.map((d,i) => (days.length > 8 && i % 2) ? '' :
+    `<text x="${x(i)}" y="${H-9}" class="ga" text-anchor="middle">${shortDate(d)}</text>`).join('');
+
+  const lines = shown.map(r => {
+    let run = 0;
+    const pts = days.map((d,i) => { run += (DAYPTS[d] && DAYPTS[d][r.player]) || 0; return [x(i), y(run)]; });
+    const path = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const c = colorOf(r.player);
+    return `<path d="${path}" fill="none" stroke="${c}" stroke-width="${r.rank === 1 ? 2.6 : 1.8}"
+              stroke-linejoin="round" stroke-linecap="round" opacity="${r.rank <= 3 ? 1 : .55}"/>
+            <circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="${r.rank === 1 ? 4 : 3}" fill="${c}"/>`;
+  }).join('');
+
+  const key = shown.map(r => `<span class="key" style="--c:${colorOf(r.player)}">${esc(r.player)}</span>`).join('');
+
+  return `<div class="panel">
+    <div class="panel-head"><span class="panel-title">The race</span><span class="panel-title">cumulative points</span></div>
+    <div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative points by day">
+      ${gridV}${xa}${lines}
+    </svg></div>
+    <div class="keys">${key}</div>
+  </div>`;
+}
+
+/* ───────────────────── shareables ───────────────────── */
+function textStandings(){
+  const rows = RUNS.filter(inPeriod(ui.period));
+  const table = tally(rows).filter(r => r.plays);
+  const head = ui.period === 'W'
+    ? `${LEAGUE} — Week #${weekNo(ui.weekMon)}\n${prettyDate(ui.weekMon)} – ${prettyDate(addDays(ui.weekMon,6))}`
+    : `${LEAGUE} — ${PERIODS.find(p => p[0] === ui.period)[1]}`;
+  const w = Math.min(20, Math.max(...table.map(r => r.player.length)));
+  const body = table.map(r =>
+    `${String(r.rank).padStart(2)}  ${r.player.slice(0,w).padEnd(w)}  ${String(r.pts).padStart(4)}`).join('\n');
+  return '```\n' + head + '\n\n' + body + '\n\nScored through ' +
+         (DAYS.length ? prettyDate(DAYS[DAYS.length-1]) : '—') + '\n```';
+}
+
+/* The wrap card is drawn straight onto a canvas so it comes out as a real
+   image at a real size — 1080 × 1350, which is what the group chat and
+   the feed both want. */
+function drawWrap(canvas){
+  const W = 1080, H = 1350, c = canvas.getContext('2d');
+  canvas.width = W; canvas.height = H;
+
+  const rows = ui.period === 'W' ? weekRows(ui.weekMon) : RUNS.filter(inPeriod(ui.period));
+  const days = ui.period === 'W' ? weekDays(ui.weekMon) : DAYS.filter(inPeriodDay(ui.period));
+  const table = tally(rows).filter(r => r.plays);
+  if(!table.length) return;
+  const fin = rows.filter(r => !r.missed);
+  const fastest = fin.reduce((a,r) => r.seconds < a.seconds ? r : a);
+  const heats = new Set(fin.map(r => r.date + r.game)).size;
+
+  const bg = c.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#1B2468'); bg.addColorStop(.55,'#242F84'); bg.addColorStop(1,'#12163C');
+  c.fillStyle = bg; c.fillRect(0,0,W,H);
+  c.strokeStyle = 'rgba(255,255,255,.055)'; c.lineWidth = 1;
+  for(let i = 60; i < W; i += 60){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,H); c.stroke(); }
+  for(let i = 60; i < H; i += 60){ c.beginPath(); c.moveTo(0,i); c.lineTo(W,i); c.stroke(); }
+
+  const disp = w => `${w} "Bricolage Grotesque", sans-serif`;
+  const monoF = s => `${s}px "DM Mono", monospace`;
+  const mid = t => c.measureText(t).width;
+
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = 'rgba(255,255,255,.62)'; c.font = monoF(24);
+  c.letterSpacing = '6px';
+  c.fillText(LEAGUE.toUpperCase(), 80, 118);
+  c.letterSpacing = '0px';
+
+  const label = ui.period === 'W' ? 'WEEK #' + weekNo(ui.weekMon)
+              : PERIODS.find(p => p[0] === ui.period)[1].toUpperCase();
+  c.fillStyle = '#FFFFFF'; c.font = disp('800 132px');
+  c.fillText(label, 76, 250);
+
+  c.fillStyle = 'rgba(255,255,255,.6)'; c.font = monoF(27);
+  c.fillText(ui.period === 'W'
+    ? prettyDate(ui.weekMon) + '  –  ' + prettyDate(addDays(ui.weekMon,6))
+    : (days.length ? prettyDate(days[0]) + '  –  ' + prettyDate(days[days.length-1]) : ''), 80, 300);
+
+  /* champion block */
+  const champ = table[0], runner = table.find(r => r.rank > 1);
+  c.fillStyle = 'rgba(255,255,255,.07)';
+  roundRect(c, 64, 356, W-128, 300, 32); c.fill();
+
+  c.fillStyle = '#E4B23E'; c.font = monoF(22); c.letterSpacing = '6px';
+  c.fillText(weekDone(ui.weekMon) || ui.period !== 'W' ? 'CHAMPION' : 'LEADING', 108, 424);
+  c.letterSpacing = '0px';
+
+  c.fillStyle = colorOf(champ.player); roundRect(c, 112, 474, 16, 132, 8); c.fill();
+
+  c.fillStyle = '#fff';
+  let size = 74;
+  c.font = disp('800 ' + size + 'px');
+  while(mid(champ.player) > W - 400 && size > 40){ size -= 4; c.font = disp('800 ' + size + 'px'); }
+  c.fillText(champ.player, 156, 536);
+
+  c.fillStyle = 'rgba(255,255,255,.72)'; c.font = monoF(30);
+  c.fillText(champ.pts + ' pts' + (runner ? '   ·   +' + (champ.pts - runner.pts) + ' clear' : '') +
+             '   ·   ' + champ.g + ' wins', 158, 588);
+
+  /* the chasers */
+  [table[1], table[2]].forEach((r,i) => {
+    if(!r) return;
+    const y = 730 + i * 96;
+    c.fillStyle = 'rgba(255,255,255,.05)'; roundRect(c, 64, y - 46, W-128, 88, 22); c.fill();
+    c.fillStyle = i ? '#CE8850' : '#A6B3C9'; c.font = disp('800 40px');
+    c.fillText(String(r.rank), 104, y + 14);
+    c.fillStyle = colorOf(r.player); roundRect(c, 176, y - 22, 10, 44, 5); c.fill();
+    c.fillStyle = '#fff'; c.font = disp('700 40px');
+    c.fillText(r.player, 206, y + 14);
+    c.fillStyle = 'rgba(255,255,255,.66)'; c.font = monoF(32); c.textAlign = 'right';
+    c.fillText(String(r.pts), W - 104, y + 12); c.textAlign = 'left';
+  });
+
+  /* the line that says what actually happened */
+  const dayWins = {};
+  days.forEach(d => { const w = Object.entries(DAYRANK[d] || {}).find(e => e[1] === 1);
+    if(w) dayWins[w[0]] = (dayWins[w[0]] || 0) + 1; });
+  const topDays = Object.entries(dayWins).sort((a,b) => b[1] - a[1])[0];
+  c.fillStyle = 'rgba(255,255,255,.42)'; c.font = monoF(19); c.letterSpacing = '3px';
+  c.fillText('HOW IT WENT', 80, 918); c.letterSpacing = '0px';
+  c.font = disp('700 40px');
+  const story = runner
+    ? [['#E4B23E', (champ.pts - runner.pts) + ' points'], ['rgba(255,255,255,.86)', ' in it after ' + heats + ' heats']]
+    : [['rgba(255,255,255,.86)', heats + ' heats played']];
+  let sx = 80;
+  story.forEach(([col, txt]) => { c.fillStyle = col; c.fillText(txt, sx, 972); sx += mid(txt); });
+  if(topDays){
+    c.fillStyle = 'rgba(255,255,255,.55)'; c.font = monoF(25);
+    c.fillText(topDays[0].split(' ')[0] + ' topped ' + topDays[1] + ' of the ' + days.length + ' days', 80, 1014);
+  }
+
+  /* the footer facts */
+  const facts = [
+    ['TURNOUT', Math.round(fin.length / Math.max(1, table.length * heats) * 100) + '%'],
+    ['FASTEST', fmtTime(fastest.seconds)],
+    ['SET BY', fastest.player.split(' ')[0]],
+    ['PLAYERS', String(table.length)]
+  ];
+  facts.forEach((f,i) => {
+    const x = 80 + i * ((W - 160) / 4);
+    c.fillStyle = 'rgba(255,255,255,.42)'; c.font = monoF(19); c.letterSpacing = '3px';
+    c.fillText(f[0], x, 1078); c.letterSpacing = '0px';
+    c.fillStyle = '#fff'; c.font = disp('700 44px');
+    c.fillText(f[1], x, 1128);
+  });
+
+  /* strip of the week's daily winners */
+  c.fillStyle = 'rgba(255,255,255,.42)'; c.font = monoF(19); c.letterSpacing = '3px';
+  c.fillText('DAY BY DAY', 80, 1190); c.letterSpacing = '0px';
+  days.forEach((d,i) => {
+    const w = (W - 160) / Math.max(days.length, 1), x = 80 + i * w;
+    const top = Object.entries(DAYRANK[d] || {}).find(e => e[1] === 1);
+    c.fillStyle = 'rgba(255,255,255,.09)'; roundRect(c, x + 3, 1210, w - 6, 86, 14); c.fill();
+    c.textAlign = 'center';
+    c.fillStyle = 'rgba(255,255,255,.5)'; c.font = monoF(17);
+    c.fillText(DAYNAMES[parseYmd(d).getDay()], x + w/2, 1236);
+    if(top){
+      c.fillStyle = colorOf(top[0]); roundRect(c, x + w/2 - 14, 1262, 28, 11, 5); c.fill();
+    }
+    c.textAlign = 'left';
+  });
+
+  c.fillStyle = 'rgba(255,255,255,.34)'; c.font = monoF(20);
+  c.fillText('Scored through ' + (DAYS.length ? prettyDate(DAYS[DAYS.length-1]) : '—'), 80, 1332);
+}
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+const inPeriodDay = p => d => p === 'A' ? true
+  : p === 'M' ? d.slice(0,7) === today().slice(0,7)
+  : p === 'Y' ? d.slice(0,4) === today().slice(0,4)
+  : mondayOf(d) === ui.weekMon;
+
+function openWrap(){
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="sheet">
+      <div class="sheet-head"><span class="panel-title">Shareable card</span>
+        <button class="x" data-close="1" aria-label="Close">✕</button></div>
+      <div class="shot"><canvas id="wrapc"></canvas></div>
+      <div class="sheet-foot">
+        <button class="act" data-tool="png">Download PNG</button>
+        <button class="act ghost" data-tool="share">Share</button>
+        <button class="act ghost" data-tool="copy">Copy as text</button>
+      </div>
+      <p class="hint">1080 × 1350 — sized for WhatsApp and the feed.</p>
+    </div>`;
+  m.classList.add('on');
+  const go = () => drawWrap(document.getElementById('wrapc'));
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(go);
+  go();
+}
+function closeModal(){ const m = document.getElementById('modal'); m.classList.remove('on'); m.innerHTML = ''; }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2200);
+}
+async function copyText(){
+  const s = textStandings();
+  try { await navigator.clipboard.writeText(s); toast('Standings copied'); }
+  catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = s; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast('Standings copied');
+  }
+}
+function savePng(){
+  const cv = document.getElementById('wrapc'); if(!cv) return;
+  cv.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = (ui.period === 'W' ? 'week-' + weekNo(ui.weekMon) : ui.period.toLowerCase()) + '-wrap.png';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+}
+function sharePng(){
+  const cv = document.getElementById('wrapc'); if(!cv) return;
+  cv.toBlob(async b => {
+    const file = new File([b], 'league.png', { type:'image/png' });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      try { await navigator.share({ files:[file], title:LEAGUE }); } catch(e){}
+    } else { savePng(); }
+  }, 'image/png');
+}
+
+/* ───────────────────── the banner above every view ───────────────────── */
+function periodBanner(){
+  if(ui.period === 'W'){
+    const i = MONDAYS.indexOf(ui.weekMon);
+    const end = addDays(ui.weekMon, 6);
+    const scored = weekDays(ui.weekMon).length;
+    const prev = i > 0, next = i > -1 && i < MONDAYS.length - 1;
+    return `<div class="window">
+      <span class="nav">
+        <button class="wbtn" data-week="prev" ${prev ? '' : 'disabled'} aria-label="Previous week">◀</button>
+        <button class="wbtn" data-week="next" ${next ? '' : 'disabled'} aria-label="Next week">▶</button>
+      </span>
+      <span class="wk">Week #${weekNo(ui.weekMon)}</span>
+      <span class="wr">${prettyDate(ui.weekMon)} &ndash; ${prettyDate(end)}</span>
+      <span class="wd">${weekDone(ui.weekMon) ? 'Final' : scored + ' of 7 days scored'}</span>
+    </div>`;
+  }
+  const t = today();
+  if(ui.period === 'M') return `<div class="window"><span class="wk">${MONTHS[parseYmd(t).getMonth()]} ${t.slice(0,4)}</span><span class="wr">Running total for the month</span></div>`;
+  if(ui.period === 'Y') return `<div class="window"><span class="wk">${t.slice(0,4)}</span><span class="wr">Running total for the year</span></div>`;
+  return `<div class="window"><span class="wk">All time</span><span class="wr">${
+    DAYS.length ? prettyDate(DAYS[0]) + ' &ndash; ' + prettyDate(DAYS[DAYS.length-1]) : 'Nothing logged yet'}</span></div>`;
+}
+
+/* ─────────────────────────── standings ─────────────────────────── */
+function viewBoard(rows){
+  const all = tally(rows);
+  const table = all.filter(r => r.plays);
+  const idle  = all.filter(r => !r.plays);
+  if(!table.length) return emptyPanel('No times logged for this stretch.');
+
+  const days = ui.period === 'W' ? weekDays(ui.weekMon) : DAYS.filter(inPeriodDay(ui.period));
+  const mv = ui.period === 'W' ? movementFor(ui.weekMon) : null;
+  const runner = table.find(r => r.rank > 1);
+  const finished = rows.filter(r => !r.missed);
+  const heats = new Set(finished.map(r => r.date + r.game)).size;
+  const fastest = finished.length ? finished.reduce((a,r) => r.seconds < a.seconds ? r : a) : null;
+
+  /* Turnout counts the people who actually turn up. Roster entries who have
+     never played once aren't absentees, they're not in the league yet. */
+  const slots = table.length * heats;
+  const turnout = slots ? Math.round(finished.length / slots * 100) : 0;
+
+  const body = table.map(r => {
+    const st = streakOf(r.player);
+    const f = formOf(r.player, rows, days);
+    const gap = table[0].pts - r.pts;
+    return `<tr class="r${r.rank <= 3 ? r.rank : ''}">
+      <td class="pos">${r.rank}${ui.period === 'W' && mv ? moveCell(mv, r.player) : ''}</td>
+      <td class="who">${mono(r.player)}<span class="nmw">${esc(r.player)}${
+        TITLES[r.player] ? `<b class="title" title="${TITLES[r.player]} week${TITLES[r.player]>1?'s':''} won">★${TITLES[r.player]}</b>` : ''}${
+        st > 1 ? `<span class="flame">${st} day run</span>` : ''}</span></td>
+      <td class="hide-s">${stripFor(r.player, days)}</td>
+      <td class="dim hide-s">${r.plays}<small>/${r.plays + r.missed}</small></td>
+      <td>${medals(r)}</td>
+      <td class="hide-s">${formCell(f)}</td>
+      <td class="dim hide-s">${paceCell(r)}</td>
+      <td class="pts">${r.pts}${gap ? `<small>−${gap}</small>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const ex = heatExtremes(rows);
+  const extremes = (ex.closest || ex.widest) ? `
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Heats worth arguing about</span></div>
+    <div class="facts">
+      ${ex.closest ? `<div class="fact"><dt>Closest finish</dt>
+        <dd>${ex.closest.gap === 0 ? 'Dead heat' : ex.closest.gap + 's'}</dd>
+        <p>${esc(ex.closest.first.player)} over ${esc(ex.closest.second.player)} · ${esc(ex.closest.first.game)}, ${shortDate(ex.closest.first.date)}</p></div>` : ''}
+      ${ex.widest ? `<div class="fact"><dt>Biggest spread</dt>
+        <dd>${fmtTime(ex.widest.span)}</dd>
+        <p>${esc(ex.widest.first.game)} on ${shortDate(ex.widest.first.date)} · ${fmtTime(ex.widest.first.seconds)} to ${fmtTime(ex.widest.last.seconds)}</p></div>` : ''}
+    </div>
+  </div>` : '';
+
+  const bench = idle.length ? `
+  <div class="panel bench">
+    <div class="panel-head"><span class="panel-title">Yet to play</span>
+      <span class="panel-title">not counted in turnout</span></div>
+    <div class="benchlist">${idle.map(r =>
+      `<span class="ghost">${mono(r.player)}${esc(r.player)}</span>`).join('')}</div>
+  </div>` : '';
+
+  return podium(table) + `
+  <div class="panel"><dl class="kpis">
+    <div class="kpi"><dt>Leader</dt><dd class="name">${esc(table[0].player)}</dd></div>
+    <div class="kpi"><dt>Margin</dt><dd>${runner ? '+' + (table[0].pts - runner.pts) : '—'}</dd></div>
+    <div class="kpi"><dt>Heats</dt><dd>${heats}</dd></div>
+    <div class="kpi"><dt>Fastest solve</dt><dd>${fastest ? fmtTime(fastest.seconds) + '<small>' + esc(fastest.player) + ' &middot; ' + esc(fastest.game) + '</small>' : '&mdash;'}</dd></div>
+    <div class="kpi"><dt>Turnout</dt><dd>${turnout}<small>% of ${table.length} active</small></dd></div>
+  </dl></div>`
+  + raceChart(rows, days) + `
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Table</span><span class="panel-title">10 · 9 · 8 … 1</span></div>
+    <table>
+      <thead><tr><th>#</th><th class="who">Player</th><th class="hide-s">${ui.period === 'W' ? 'The week' : 'Last ' + Math.min(DAYS.length,STRIP) + ' days'}</th>
+        <th class="hide-s">Played</th><th>Medals</th><th class="hide-s">Form</th>
+        <th class="hide-s" title="Typical time as a multiple of the fastest solve in that heat">Pace</th><th>Points</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="legend">
+      <span><i style="background:var(--gold)"></i>Topped the day</span>
+      <span><i style="background:var(--silver)"></i>Second</span>
+      <span><i style="background:var(--bronze)"></i>Third</span>
+      <span><i style="background:var(--plain)"></i>Top six</span>
+      <span><i style="background:var(--plain);opacity:.42"></i>Scored</span>
+      <span><i style="background:var(--miss)"></i>Nothing</span>
+      <span class="note">Pace is the median multiple of each heat's fastest solve — a like-for-like speed measure across games of very different lengths.</span>
+    </div>
+  </div>` + extremes + bench;
+}
+
+/* ─────────────────────────── games ─────────────────────────── */
+function viewGames(rows){
+  const played = GAMELIST.filter(g => RUNS.some(r => r.game === g));
+  if(!played.length) return emptyPanel('No games logged yet.');
+  if(ui.game !== 'ALL' && !played.includes(ui.game)) ui.game = 'ALL';
+
+  const picker = `<div class="chips">
+    <button class="chip" data-game="ALL" aria-pressed="${ui.game === 'ALL'}">All games</button>
+    ${played.map(g => `<button class="chip" data-game="${esc(g)}" aria-pressed="${ui.game === g}">${esc(g)}</button>`).join('')}
+  </div>`;
+
+  if(ui.game === 'ALL'){
+    const table = tally(rows).filter(r => r.plays);
+    if(!table.length) return picker + emptyPanel('Nothing in this stretch.');
+    const cols = played.filter(g => rows.some(r => r.game === g));
+    const bestIn = {};
+    cols.forEach(g => { bestIn[g] = Math.max(...table.map(r =>
+      rows.filter(x => x.player === r.player && x.game === g).reduce((a,x) => a + x.points, 0))); });
+    const body = table.map(r => `<tr>
+      <td class="who">${mono(r.player)}<span class="nmw">${esc(r.player)}</span></td>
+      ${cols.map(g => {
+        const p = rows.filter(x => x.player === r.player && x.game === g).reduce((a,x) => a + x.points, 0);
+        return `<td class="${p ? (p === bestIn[g] ? 'hot' : '') : 'dim'}">${p}</td>`;
+      }).join('')}
+      <td class="pts">${r.pts}</td></tr>`).join('');
+    return picker + `<div class="panel">
+      <div class="panel-head"><span class="panel-title">Points by game</span><span class="panel-title">best in each column highlighted</span></div>
+      <table><thead><tr><th>Player</th>${cols.map(g => `<th>${esc(g)}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody>${body}</tbody></table></div>` + recordsPanel();
+  }
+
+  const gr = rows.filter(r => r.game === ui.game);
+  if(!gr.length) return picker + emptyPanel('Nobody has played this one in this stretch.');
+  const table = tally(gr).filter(r => r.plays);
+  const ran = gr.filter(r => !r.missed);
+  const quickest = table.reduce((a,b) => b.best < a.best ? b : a, { best:Infinity, player:'—' });
+  const rec = RECORDS.find(r => r.game === ui.game);
+
+  const body = table.map(r => `<tr class="r${r.rank <= 3 ? r.rank : ''}">
+    <td class="pos">${r.rank}</td>
+    <td class="who">${mono(r.player)}<span class="nmw">${esc(r.player)}</span></td>
+    <td class="dim">${r.plays}</td>
+    <td class="${r.missed ? 'miss' : 'dim'}">${r.missed || '—'}</td>
+    <td>${medals(r)}</td>
+    <td>${bestOf(r)}${rec && r.best === rec.seconds ? '<b class="rec">REC</b>' : ''}</td>
+    <td class="dim hide-s">${avgOf(r)}</td>
+    <td class="dim hide-s">${paceCell(r)}</td>
+    <td class="pts">${r.pts}</td></tr>`).join('');
+
+  const recent = [...new Set(gr.map(r => r.date))].sort().reverse().slice(0,6).map(d => `
+    <div class="heat"><div class="heat-day">${prettyDate(d)}</div>
+      ${gr.filter(r => r.date === d)
+           .sort((a,b) => (a.rank || 99) - (b.rank || 99))
+           .map(r => r.missed
+             ? `<span class="run dnp"><b>${esc(r.player)}</b><span class="t">didn't play</span></span>`
+             : `<span class="run ${r.rank === 1 ? 'win' : ''}"><b>${esc(r.player)}</b><span class="t">${fmtTime(r.seconds)}</span><span class="p">+${r.points}</span></span>`
+      ).join('')}
+    </div>`).join('');
+
+  return picker + `
+  <div class="panel"><dl class="kpis">
+    <div class="kpi"><dt>Course record</dt><dd>${rec ? fmtTime(rec.seconds) : '—'}<small>${rec ? esc(rec.holders.join(', ')) : ''}</small></dd></div>
+    <div class="kpi"><dt>Best here</dt><dd>${quickest.best < Infinity ? fmtTime(quickest.best) : '—'}<small>${esc(quickest.player)}</small></dd></div>
+    <div class="kpi"><dt>Heats</dt><dd>${new Set(ran.map(r => r.date)).size}</dd></div>
+    <div class="kpi"><dt>Field average</dt><dd>${ran.length ? fmtTime(Math.round(ran.reduce((a,r) => a + r.seconds, 0) / ran.length)) : '—'}</dd></div>
+    <div class="kpi"><dt>Misses</dt><dd>${gr.length - ran.length}</dd></div>
+  </dl></div>
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">${esc(ui.game)}</span></div>
+    <table><thead><tr><th>#</th><th class="who">Player</th><th>Played</th><th>Missed</th><th>Medals</th>
+      <th>Best</th><th class="hide-s">Avg</th><th class="hide-s">Pace</th><th>Points</th></tr></thead><tbody>${body}</tbody></table>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Recent heats</span></div>${recent}
+  </div>`;
+}
+
+function recordsPanel(){
+  if(!RECORDS.length) return '';
+  return `<div class="panel">
+    <div class="panel-head"><span class="panel-title">Course records</span><span class="panel-title">all time</span></div>
+    <div class="recs">${RECORDS.map(r => `<div class="rec-row">
+      <span class="rg">${esc(r.game)}</span>
+      <span class="rt">${fmtTime(r.seconds)}</span>
+      <span class="rh">${r.holders.map(h => mono(h) + esc(h)).join(' &amp; ')}</span>
+      <span class="rd">${shortDate(r.date)}</span>
+    </div>`).join('')}</div></div>`;
+}
+
+/* ─────────────────────────── players ─────────────────────────── */
+function viewPlayers(rows){
+  const everyone = tally(RUNS).filter(r => r.plays);
+  if(!everyone.length) return emptyPanel('No results yet.');
+  if(!ui.player || !everyone.some(r => r.player === ui.player)) ui.player = everyone[0].player;
+
+  const picker = `<div class="chips">${everyone.map(r =>
+    `<button class="chip" data-player="${esc(r.player)}" aria-pressed="${ui.player === r.player}">${esc(r.player)}</button>`).join('')}</div>`;
+
+  const mine = rows.filter(r => r.player === ui.player);
+  if(!mine.length) return picker + emptyPanel('Nothing logged for them in this stretch.');
+  const table = tally(rows);
+  const me = table.find(r => r.player === ui.player);
+  const st = streakOf(ui.player);
+  const days = ui.period === 'W' ? weekDays(ui.weekMon) : DAYS.filter(inPeriodDay(ui.period));
+  const prof = gameProfile(ui.player, rows);
+  const f = formOf(ui.player, rows, days);
+  const heldRecs = RECORDS.filter(r => r.holders.includes(ui.player));
+
+  const badges = `<div class="badges">
+    ${prof ? `<span class="badge good"><b>Specialist</b>${esc(prof.best.game)} · avg ${prof.best.avg.toFixed(1)}</span>` : ''}
+    ${prof ? `<span class="badge bad"><b>Nemesis</b>${esc(prof.worst.game)} · avg ${prof.worst.avg.toFixed(1)}</span>` : ''}
+    ${TITLES[ui.player] ? `<span class="badge gold"><b>Weeks won</b>${TITLES[ui.player]}</span>` : ''}
+    ${heldRecs.length ? `<span class="badge gold"><b>Records held</b>${heldRecs.map(r => esc(r.game)).join(', ')}</span>` : ''}
+  </div>`;
+
+  const body = GAMELIST.filter(g => mine.some(r => r.game === g)).map(g => {
+    const gr = mine.filter(r => r.game === g);
+    const ran = gr.filter(r => !r.missed);
+    return `<tr>
+      <td class="who">${esc(g)}</td>
+      <td class="dim">${ran.length}</td>
+      <td class="${gr.length - ran.length ? 'miss' : 'dim'}">${(gr.length - ran.length) || '—'}</td>
+      <td class="dim">${ran.filter(r => r.rank === 1).length}</td>
+      <td class="dim">${ran.length ? (ran.reduce((a,r) => a + r.rank, 0) / ran.length).toFixed(1) : '—'}</td>
+      <td>${ran.length ? fmtTime(Math.min(...ran.map(r => r.seconds))) : '—'}</td>
+      <td class="dim hide-s">${ran.length ? fmtTime(Math.round(ran.reduce((a,r) => a + r.seconds, 0) / ran.length)) : '—'}</td>
+      <td class="dim hide-s">${ran.length ? median(ran.map(r => r.ratio)).toFixed(1) + '×' : '—'}</td>
+      <td class="pts">${ran.reduce((a,r) => a + r.points, 0)}</td></tr>`;
+  }).join('');
+
+  return picker + `
+  <div class="panel">
+    <dl class="kpis">
+      <div class="kpi"><dt>Position</dt><dd>${me.rank}<small>of ${table.filter(r=>r.plays).length}</small></dd></div>
+      <div class="kpi"><dt>Points</dt><dd>${me.pts}</dd></div>
+      <div class="kpi"><dt>Medals</dt><dd>${me.g}<small>${me.s} · ${me.b}</small></dd></div>
+      <div class="kpi"><dt>Median finish</dt><dd>${me.med != null ? me.med : '—'}</dd></div>
+      <div class="kpi"><dt title="Standard deviation of finishing position — low means metronomic, high means streaky">Volatility</dt><dd>${me.vol != null ? me.vol.toFixed(1) : '—'}</dd></div>
+      <div class="kpi"><dt>Pace</dt><dd>${paceCell(me)}<small>median vs heat best</small></dd></div>
+      <div class="kpi"><dt>Best solve</dt><dd>${bestOf(me)}</dd></div>
+      <div class="kpi"><dt>Form</dt><dd>${formCell(f)}<small>pts/day, last 3</small></dd></div>
+      ${me.missed ? `<div class="kpi"><dt>Missed</dt><dd>${me.missed}<small>of ${me.plays + me.missed} slots</small></dd></div>` : ''}
+      ${st > 1 ? `<div class="kpi"><dt>Current run</dt><dd>${st}<small>days on top</small></dd></div>` : ''}
+    </dl>
+    ${badges}
+    <div class="legend"><span>${ui.period === 'W' ? 'This week' : 'Last ' + Math.min(DAYS.length,STRIP) + ' days'}</span>${stripFor(ui.player, days)}</div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">${esc(ui.player)} · game by game</span></div>
+    <table><thead><tr><th>Game</th><th>Played</th><th>Missed</th><th>Wins</th><th>Avg finish</th>
+      <th>Best</th><th class="hide-s">Avg time</th><th class="hide-s">Pace</th><th>Points</th></tr></thead><tbody>${body}</tbody></table>
+  </div>`;
+}
+
+/* ─────────────────────────── head to head ─────────────────────────── */
+function viewH2H(rows){
+  const everyone = tally(RUNS).filter(r => r.plays).map(r => r.player);
+  if(everyone.length < 2) return emptyPanel('Two players needed for a duel.');
+  if(!everyone.includes(ui.p1)) ui.p1 = everyone[0];
+  if(!everyone.includes(ui.p2) || ui.p2 === ui.p1) ui.p2 = everyone.find(p => p !== ui.p1);
+
+  const pick = (side, val) => `<div class="side"><span class="side-l">${side === 'p1' ? 'Player' : 'Against'}</span>
+    <div class="chips">${everyone.map(p =>
+      `<button class="chip" data-${side}="${esc(p)}" aria-pressed="${val === p}" ${side === 'p2' && p === ui.p1 ? 'disabled' : ''}>${esc(p)}</button>`).join('')}</div></div>`;
+
+  const picker = `<div class="duelpick">${pick('p1', ui.p1)}${pick('p2', ui.p2)}</div>`;
+
+  /* Only heats both of them actually finished count as a duel. */
+  const byHeat = {};
+  rows.filter(r => !r.missed && (r.player === ui.p1 || r.player === ui.p2))
+      .forEach(r => (byHeat[r.date+'|'+r.game] = byHeat[r.date+'|'+r.game] || {})[r.player] = r);
+  const duels = Object.values(byHeat).filter(h => h[ui.p1] && h[ui.p2]);
+  if(!duels.length) return picker + emptyPanel('They have never gone head to head in this stretch.');
+
+  let a = 0, b = 0, draw = 0, gap = 0;
+  const byGame = {};
+  duels.forEach(h => {
+    const x = h[ui.p1], y = h[ui.p2];
+    if(x.seconds < y.seconds) a++; else if(y.seconds < x.seconds) b++; else draw++;
+    gap += x.seconds - y.seconds;
+    const g = byGame[x.game] = byGame[x.game] || { n:0, a:0, b:0, ga:0, gb:0 };
+    g.n++; g.ga += x.seconds; g.gb += y.seconds;
+    if(x.seconds < y.seconds) g.a++; else if(y.seconds < x.seconds) g.b++;
+  });
+
+  const bar = `<div class="h2hbar">
+    <span style="flex:${a || .001};background:${colorOf(ui.p1)}">${a}</span>
+    ${draw ? `<span class="dr" style="flex:${draw}">${draw}</span>` : ''}
+    <span style="flex:${b || .001};background:${colorOf(ui.p2)}">${b}</span>
+  </div>`;
+
+  const gameBody = GAMELIST.filter(g => byGame[g]).map(g => {
+    const x = byGame[g];
+    return `<tr>
+      <td class="who">${esc(g)}</td>
+      <td class="dim">${x.n}</td>
+      <td class="${x.a > x.b ? 'hot' : 'dim'}">${x.a}</td>
+      <td class="${x.b > x.a ? 'hot' : 'dim'}">${x.b}</td>
+      <td class="dim hide-s">${fmtTime(Math.round(x.ga/x.n))}</td>
+      <td class="dim hide-s">${fmtTime(Math.round(x.gb/x.n))}</td>
+      <td class="pts">${x.ga <= x.gb ? '' : '−'}${fmtTime(Math.abs(Math.round((x.ga-x.gb)/x.n)))}</td></tr>`;
+  }).join('');
+
+  const recent = duels.slice(-6).reverse().map(h => {
+    const x = h[ui.p1], y = h[ui.p2];
+    return `<div class="duel">
+      <span class="dg">${esc(x.game)} · ${shortDate(x.date)}</span>
+      <span class="dt ${x.seconds <= y.seconds ? 'w' : ''}">${fmtTime(x.seconds)}</span>
+      <span class="dv">v</span>
+      <span class="dt ${y.seconds <= x.seconds ? 'w' : ''}">${fmtTime(y.seconds)}</span>
+    </div>`;
+  }).join('');
+
+  return picker + `
+  <div class="panel">
+    <div class="duelhead">
+      <div class="dp">${mono(ui.p1)}<b>${esc(ui.p1)}</b></div>
+      <span class="dvs">${a}&ndash;${b}</span>
+      <div class="dp right"><b>${esc(ui.p2)}</b>${mono(ui.p2)}</div>
+    </div>
+    ${bar}
+    <dl class="kpis">
+      <div class="kpi"><dt>Duels</dt><dd>${duels.length}</dd></div>
+      <div class="kpi"><dt>Win rate</dt><dd>${Math.round(a / duels.length * 100)}<small>% for ${esc(ui.p1.split(' ')[0])}</small></dd></div>
+      <div class="kpi"><dt>Average gap</dt><dd>${gap >= 0 ? '+' : '−'}${fmtTime(Math.abs(Math.round(gap/duels.length)))}<small>${gap >= 0 ? 'behind' : 'ahead'}</small></dd></div>
+      <div class="kpi"><dt>Dead heats</dt><dd>${draw}</dd></div>
+    </dl>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Game by game</span></div>
+    <table><thead><tr><th>Game</th><th>Duels</th><th>${esc(ui.p1.split(' ')[0])}</th><th>${esc(ui.p2.split(' ')[0])}</th>
+      <th class="hide-s">Avg</th><th class="hide-s">Avg</th><th>Gap</th></tr></thead><tbody>${gameBody}</tbody></table>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Latest duels</span></div>
+    <div class="duels">${recent}</div>
+  </div>`;
+}
+
+/* ─────────────────────────── season ─────────────────────────── */
+function viewSeason(){
+  if(!LEDGER.length) return emptyPanel('No weeks logged yet.');
+  const done = LEDGER.filter(w => w.done && w.champ);
+  const champs = [...new Set(done.map(w => w.champ.player))];
+  const best = done.reduce((a,w) => !a || w.champ.pts > a.champ.pts ? w : a, null);
+  const holder = LEDGER[LEDGER.length-1];
+
+  const body = [...LEDGER].reverse().map(w => `<tr class="${w.done ? '' : 'live'}">
+    <td class="pos">#${w.no}</td>
+    <td class="who">${shortDate(w.mon)} – ${shortDate(addDays(w.mon,6))}${w.done ? '' : '<span class="flame">live</span>'}</td>
+    <td class="who">${w.champ ? mono(w.champ.player) + '<span class="nmw">' + esc(w.champ.player) + '</span>' : '—'}</td>
+    <td class="pts">${w.champ ? w.champ.pts : '—'}</td>
+    <td class="dim">${w.margin != null ? '+' + w.margin : '—'}</td>
+    <td class="dim hide-s">${w.runner ? esc(w.runner.player) : '—'}</td>
+    <td class="dim hide-s">${w.days}/7</td></tr>`).join('');
+
+  const roll = Object.entries(TITLES).sort((a,b) => b[1] - a[1]).map(([p,n]) =>
+    `<span class="crown">${mono(p)}${esc(p)}<b>${'★'.repeat(Math.min(n,5))}${n > 5 ? ' ×'+n : ''}</b></span>`).join('');
+
+  return `
+  <div class="panel"><dl class="kpis">
+    <div class="kpi"><dt>Weeks finished</dt><dd>${done.length}</dd></div>
+    <div class="kpi"><dt>Different champions</dt><dd>${champs.length}</dd></div>
+    <div class="kpi"><dt>${holder.done ? 'Reigning' : 'Currently leading'}</dt><dd class="name">${holder.champ ? esc(holder.champ.player) : '—'}</dd></div>
+    <div class="kpi"><dt>Best week</dt><dd>${best ? best.champ.pts : '—'}<small>${best ? esc(best.champ.player) + ' · wk ' + best.no : ''}</small></dd></div>
+  </dl></div>
+  ${roll ? `<div class="panel">
+    <div class="panel-head"><span class="panel-title">Roll of honour</span></div>
+    <div class="crowns">${roll}</div></div>` : ''}
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Every week</span><span class="panel-title">tap a week to open it</span></div>
+    <table><thead><tr><th>Wk</th><th class="who">Dates</th><th class="who">Champion</th><th>Pts</th><th>Margin</th>
+      <th class="hide-s">Runner-up</th><th class="hide-s">Days</th></tr></thead><tbody>${body}</tbody></table>
+  </div>` + recordsPanel();
+}
+
+/* ─────────────────────────── render ─────────────────────────── */
+function render(){
+  document.getElementById('title').textContent = LEAGUE;
+  document.getElementById('tagline').textContent =
+    ROSTER.length + ' players · ' + GAMELIST.length + ' games · ' + DAYS.length + ' days logged';
+  document.getElementById('rules').innerHTML = rulesPanel();
+
+  document.getElementById('views').innerHTML = VIEWS.map(([k,l]) =>
+    `<button data-view="${k}" aria-pressed="${ui.view === k}">${l}</button>`).join('');
+  document.getElementById('periods').innerHTML = ui.view === 'season' ? '' :
+    PERIODS.map(([k,l]) => `<button class="chip" data-period="${k}" aria-pressed="${ui.period === k}">${
+      k === 'W' && MONDAYS.length > 1 ? 'Week #' + weekNo(ui.weekMon) : l}</button>`).join('');
+
+  document.getElementById('tools').innerHTML = `
+    <button class="tool" data-tool="wrap">◈ Weekly wrap</button>
+    <button class="tool" data-tool="copy">⧉ Copy standings</button>`;
+
+  document.getElementById('warnings').innerHTML = WARN.length
+    ? `<div class="warn"><b>Check the log</b><ul>${WARN.map(w => '<li>'+w+'</li>').join('')}</ul></div>` : '';
+
+  const rows = RUNS.filter(inPeriod(ui.period));
+  document.getElementById('view').innerHTML =
+    ui.view === 'season' ? viewSeason()
+    : periodBanner() + (
+        ui.view === 'board' ? viewBoard(rows)
+      : ui.view === 'games' ? viewGames(rows)
+      : ui.view === 'h2h'   ? viewH2H(rows)
+      : viewPlayers(rows));
+
+  document.getElementById('foot').innerHTML = DAYS.length
+    ? 'Scored through ' + prettyDate(DAYS[DAYS.length-1]) +
+      '<span class="foot-note">Each day&rsquo;s puzzles are tabulated the day after, once they expire</span>'
+    : '';
+}
+
+document.addEventListener('click', e => {
+  if(e.target.id === 'modal'){ closeModal(); return; }
+  const b = e.target.closest('button'); if(!b) return;
+
+  if(b.dataset.close){ closeModal(); return; }
+  if(b.dataset.tool){
+    const t = b.dataset.tool;
+    if(t === 'wrap') openWrap();
+    else if(t === 'copy') copyText();
+    else if(t === 'png') savePng();
+    else if(t === 'share') sharePng();
+    return;
+  }
+  if(b.dataset.week){
+    const i = MONDAYS.indexOf(ui.weekMon);
+    const j = b.dataset.week === 'prev' ? i - 1 : i + 1;
+    if(j < 0 || j >= MONDAYS.length) return;
+    ui.weekMon = MONDAYS[j];
+  }
+  else if(b.dataset.view){ ui.view = b.dataset.view; }
+  else if(b.dataset.period){ ui.period = b.dataset.period; }
+  else if(b.dataset.game){ ui.game = b.dataset.game; }
+  else if(b.dataset.player){ ui.player = b.dataset.player; }
+  else if(b.dataset.p1){ ui.p1 = b.dataset.p1; if(ui.p2 === ui.p1) ui.p2 = ''; }
+  else if(b.dataset.p2){ ui.p2 = b.dataset.p2; }
+  else return;
+  render();
+});
+
+/* Arrow keys page through the weeks. */
+document.addEventListener('keydown', e => {
+  if(document.getElementById('modal').classList.contains('on') && e.key === 'Escape'){ closeModal(); return; }
+  if(ui.view === 'season' || ui.period !== 'W') return;
+  if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if(/input|textarea/i.test((e.target.tagName || ''))) return;
+  const i = MONDAYS.indexOf(ui.weekMon) + (e.key === 'ArrowLeft' ? -1 : 1);
+  if(i < 0 || i >= MONDAYS.length) return;
+  ui.weekMon = MONDAYS[i]; render();
+});
+
+render();
+</script>
+</body>
+</html>
