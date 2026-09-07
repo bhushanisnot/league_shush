@@ -712,6 +712,14 @@ const LOG = `
     .badge:hover{transform:translateY(-2px)}
   }
 
+  .eqp{color:var(--gold);font-weight:500;margin-right:1px}
+  .level{color:var(--gold);font-style:normal}
+  .amp{color:var(--faint);margin:0 6px;font-weight:400}
+  .step .crests{display:flex;justify-content:center;gap:5px}
+  .step.joint .nm{font-size:clamp(12px,3.1vw,15px);line-height:1.2}
+  .step.joint.p1 .nm{font-size:clamp(14px,3.8vw,19px)}
+  .step.joint .medal{color:var(--gold)}
+
   /* ═══════════════ phones ═══════════════ */
   @media (max-width:639px){
     .hide-s{display:none}
@@ -1184,15 +1192,63 @@ function tally(rows){
     if(r.rank <= 3) x.top3++;
     if(r.seconds < x.best) x.best = r.seconds;
   });
-  const list = Object.values(t).sort((a,b) =>
-    b.pts - a.pts || b.wins - a.wins || a.time - b.time || a.player.localeCompare(b.player));
-  list.forEach((r,i) => {
-    r.rank = (i && list[i-1].pts === r.pts && list[i-1].wins === r.wins) ? list[i-1].rank : i+1;
-    r.pace = median(r.ratios);
-    r.med  = median(r.ranks);
-    r.vol  = spread(r.ranks);
+  const list = Object.values(t);
+  list.forEach(r => { r.pace = median(r.ratios); r.med = median(r.ranks); r.vol = spread(r.ranks); });
+
+  /* ── separating two players level on points ──
+     In order: who won more heats outright; then, in the heats they both
+     played, who finished ahead of the other more often; then who was
+     quicker relative to the field (pace, which is length-neutral —
+     raw seconds would just reward playing the short games).
+     Total elapsed time is deliberately NOT used: it isn't comparable
+     across games of different length and it punishes playing more.
+     If all of that is level, the tie stands. */
+  const heats = {};
+  rows.forEach(r => { if(!r.missed) (heats[r.date+'|'+r.game] = heats[r.date+'|'+r.game] || []).push(r); });
+  const heatList = Object.values(heats);
+  function headToHead(a, b){
+    let A = 0, B = 0;
+    heatList.forEach(h => {
+      const x = h.find(r => r.player === a), y = h.find(r => r.player === b);
+      if(!x || !y) return;
+      if(x.rank < y.rank) A++; else if(y.rank < x.rank) B++;
+    });
+    return B - A;                       // negative means a is ahead
+  }
+  const compare = (a, b) =>
+    b.pts - a.pts ||
+    b.wins - a.wins ||
+    headToHead(a.player, b.player) ||
+    ((a.pace == null ? 99 : a.pace) - (b.pace == null ? 99 : b.pace));
+
+  list.sort((a, b) => compare(a, b) || a.player.localeCompare(b.player));
+  list.forEach((r, i) => {
+    r.rank = (i && compare(list[i-1], r) === 0) ? list[i-1].rank : i + 1;
   });
+  /* how many share each position, so the page can say so out loud */
+  const share = {};
+  list.forEach(r => { share[r.rank] = (share[r.rank] || 0) + 1; });
+  list.forEach(r => { r.shared = share[r.rank]; r.tied = share[r.rank] > 1; });
   return list;
+}
+
+/* What actually separated two players who finished level on points.
+   Returns null when nothing did — which means the tie is real. */
+function splitReason(a, b, rows){
+  if(!a || !b || a.pts !== b.pts) return null;
+  if(a.wins !== b.wins) return `heats won, ${a.wins}–${b.wins}`;
+  const heats = {};
+  rows.forEach(r => { if(!r.missed) (heats[r.date+'|'+r.game] = heats[r.date+'|'+r.game] || []).push(r); });
+  let A = 0, B = 0;
+  Object.values(heats).forEach(h => {
+    const x = h.find(r => r.player === a.player), y = h.find(r => r.player === b.player);
+    if(!x || !y) return;
+    if(x.rank < y.rank) A++; else if(y.rank < x.rank) B++;
+  });
+  if(A !== B) return `head-to-head, ${A}–${B}`;
+  if(a.pace != null && b.pace != null && a.pace !== b.pace)
+    return `pace, ${a.pace.toFixed(2)}× to ${b.pace.toFixed(2)}×`;
+  return null;
 }
 
 const median = a => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1;
@@ -1287,16 +1343,22 @@ function movementFor(mon){
 /* ───────────────────── weekly champions ledger ───────────────────── */
 const LEDGER = MONDAYS.map(mon => {
   const t = tally(weekRows(mon)).filter(r => r.plays);
+  const champs = t.filter(r => r.rank === 1);
   const runner = t.find(r => r.rank > 1);
   return {
     mon, no: weekNo(mon), days: weekDays(mon).length, done: weekDone(mon),
-    champ: t[0] || null, runner: runner || null,
-    margin: t[0] && runner ? t[0].pts - runner.pts : null,
-    third: t.find(r => r.rank > 2 && (!runner || r.player !== runner.player)) || null
+    champ: t[0] || null, champs, shared: champs.length > 1,
+    runner: runner || null,
+    /* a shared week has no margin — there is nothing between them */
+    margin: champs.length > 1 ? 0 : (t[0] && runner ? t[0].pts - runner.pts : null),
+    third: t.find(r => r.rank > 2 && (!runner || r.player !== runner.player)) || null,
+    reason: splitReason(t[0], runner, weekRows(mon))
   };
 });
+/* joint champions each take the title — neither of them lost the week */
 const TITLES = {};
-LEDGER.filter(w => w.done && w.champ).forEach(w => { TITLES[w.champ.player] = (TITLES[w.champ.player]||0) + 1; });
+LEDGER.filter(w => w.done).forEach(w =>
+  w.champs.forEach(c => { TITLES[c.player] = (TITLES[c.player] || 0) + 1; }));
 
 /* ───────────────────── course records ───────────────────── */
 /* The fastest solve ever logged for each game, and who holds it. */
@@ -1366,6 +1428,10 @@ function rulesPanel(){
         Identical times share the position and its points, and the next player drops by however many were level.</dd>
     </div>
     <div class="rule">
+      <dt>Level on points</dt>
+      <dd>Separated in this order: <b>heats won</b>, then <b>head-to-head</b> in the games both played, then <b>pace</b>. If all three are level, the position is genuinely shared — joint champions, and no runner-up.</dd>
+    </div>
+    <div class="rule">
       <dt>The week</dt>
       <dd>Monday to Sunday. The weekly table clears every Monday. Month, year and all-time keep running.</dd>
     </div>
@@ -1412,15 +1478,37 @@ function formCell(f){
 
 const paceCell = r => r.pace ? `${r.pace.toFixed(1)}&times;` : '—';
 
+/* The podium is built from positions, not from array slots — otherwise
+   two players level on points get rendered as first and second, which is
+   exactly the thing we're trying not to say. */
 function podium(table){
-  const order = [table[1], table[0], table[2]];
-  const cls = ['p2','p1','p3'], med = ['SECOND','FIRST','THIRD'];
-  return `<div class="panel"><div class="podium">${order.map((r,i) => `
-    <div class="step ${r ? cls[i] : ''}">
-      <div class="medal">${med[i]}</div>
-      ${r ? `<span class="crest" style="--c:${colorOf(r.player)}"></span>` : ''}
-      <div class="nm">${r ? esc(r.player) : '—'}</div>
-      <div class="pt">${r ? '<b>'+r.pts+'</b> pts' : 'unclaimed'}</div>
+  const places = [...new Set(table.map(r => r.rank))].sort((a,b) => a - b).slice(0,3);
+  const at = rk => table.filter(r => r.rank === rk);
+  const wordFor = rk => rk === 1 ? 'FIRST' : rk === 2 ? 'SECOND' : rk === 3 ? 'THIRD'
+                       : (rk + suffix(rk)).toUpperCase();
+
+  const slot = rk => {
+    if(rk == null) return { cls:'', label:'—', names:null };
+    const g = at(rk);
+    return {
+      cls: rk <= 3 ? 'p' + rk : '',
+      label: (g.length > 1 ? 'JOINT ' : '') + wordFor(rk),
+      names: g
+    };
+  };
+
+  const order = [slot(places[1]), slot(places[0]), slot(places[2])];
+  return `<div class="panel"><div class="podium">${order.map(s => `
+    <div class="step ${s.cls}${s.names && s.names.length > 1 ? ' joint' : ''}">
+      <div class="medal">${s.label}</div>
+      ${s.names ? `<span class="crests">${s.names.slice(0,3).map(r =>
+        `<span class="crest" style="--c:${colorOf(r.player)}"></span>`).join('')}</span>` : ''}
+      <div class="nm">${s.names
+        ? s.names.length > 2
+          ? esc(s.names.length + ' players level')
+          : s.names.map(r => esc(r.player)).join('<span class="amp">&amp;</span>')
+        : '—'}</div>
+      <div class="pt">${s.names ? '<b>' + s.names[0].pts + '</b> pts' : 'unclaimed'}</div>
     </div>`).join('')}</div></div>`;
 }
 
@@ -1532,23 +1620,34 @@ function drawWrap(canvas){
 
   /* champion block */
   const champ = table[0], runner = table.find(r => r.rank > 1);
+  const cochamps = table.filter(r => r.rank === 1);
+  const shared = cochamps.length > 1;
   c.fillStyle = 'rgba(255,255,255,.07)';
   roundRect(c, 64, 356, W-128, 300, 32); c.fill();
 
   c.fillStyle = '#E4B23E'; c.font = monoF(22); c.letterSpacing = '6px';
-  c.fillText(weekDone(ui.weekMon) || ui.period !== 'W' ? 'CHAMPION' : 'LEADING', 108, 424);
+  c.fillText((weekDone(ui.weekMon) || ui.period !== 'W' ? 'CHAMPION' : 'LEADING') +
+             (shared ? 'S · SHARED' : ''), 108, 424);
   c.letterSpacing = '0px';
 
-  c.fillStyle = colorOf(champ.player); roundRect(c, 112, 474, 16, 132, 8); c.fill();
+  cochamps.slice(0,2).forEach((r,i) => {
+    c.fillStyle = colorOf(r.player);
+    roundRect(c, 112, shared ? 470 + i * 74 : 474, 16, shared ? 60 : 132, 8); c.fill();
+  });
 
   c.fillStyle = '#fff';
-  let size = 74;
+  const headline = shared
+    ? cochamps.slice(0,2).map(r => r.player).join('  &  ')
+    : champ.player;
+  let size = shared ? 58 : 74;
   c.font = disp('800 ' + size + 'px');
-  while(mid(champ.player) > W - 400 && size > 40){ size -= 4; c.font = disp('800 ' + size + 'px'); }
-  c.fillText(champ.player, 156, 536);
+  while(mid(headline) > W - 400 && size > 32){ size -= 4; c.font = disp('800 ' + size + 'px'); }
+  c.fillText(headline, 156, 536);
 
   c.fillStyle = 'rgba(255,255,255,.72)'; c.font = monoF(30);
-  c.fillText(champ.pts + ' pts' + (runner ? '   ·   +' + (champ.pts - runner.pts) + ' clear' : '') +
+  c.fillText(champ.pts + ' pts' +
+             (shared ? '   ·   level at the top'
+                     : (runner ? '   ·   +' + (champ.pts - runner.pts) + ' clear' : '')) +
              '   ·   ' + champ.g + ' wins', 158, 588);
 
   /* the chasers */
@@ -1714,6 +1813,7 @@ function viewBoard(rows){
   const days = ui.period === 'W' ? weekDays(ui.weekMon) : DAYS.filter(inPeriodDay(ui.period));
   const mv = ui.period === 'W' ? movementFor(ui.weekMon) : null;
   const runner = table.find(r => r.rank > 1);
+  const split = splitReason(table[0], runner, rows);
   const finished = rows.filter(r => !r.missed);
   const heats = new Set(finished.map(r => r.date + r.game)).size;
   const fastest = finished.length ? finished.reduce((a,r) => r.seconds < a.seconds ? r : a) : null;
@@ -1728,7 +1828,7 @@ function viewBoard(rows){
     const f = formOf(r.player, rows, days);
     const gap = table[0].pts - r.pts;
     return `<tr class="r${r.rank <= 3 ? r.rank : ''}">
-      <td class="pos">${r.rank}${ui.period === 'W' && mv ? moveCell(mv, r.player) : ''}</td>
+      <td class="pos">${r.tied ? '<span class="eqp" title="shared with ' + (r.shared - 1) + ' other' + (r.shared > 2 ? 's' : '') + '">=</span>' : ''}${r.rank}${ui.period === 'W' && mv ? moveCell(mv, r.player) : ''}</td>
       <td class="who">${mono(r.player)}<span class="nmw">${esc(r.player)}${
         TITLES[r.player] ? `<b class="title" title="${TITLES[r.player]} week${TITLES[r.player]>1?'s':''} won">★${TITLES[r.player]}</b>` : ''}${
         st > 1 ? `<span class="flame">${st} day run</span>` : ''}</span></td>
@@ -1765,8 +1865,12 @@ function viewBoard(rows){
 
   return podium(table) + `
   <div class="panel"><dl class="kpis">
-    <div class="kpi"><dt>Leader</dt><dd class="name">${esc(table[0].player)}</dd></div>
-    <div class="kpi"><dt>Margin</dt><dd>${runner ? '+' + (table[0].pts - runner.pts) : '—'}</dd></div>
+    <div class="kpi"><dt>${table[0].tied ? 'Level at the top' : 'Leader'}</dt><dd class="name">${
+      table.filter(r => r.rank === 1).map(r => esc(r.player)).join(table[0].shared > 2 ? ', ' : ' & ')}</dd></div>
+    <div class="kpi"><dt>Margin</dt><dd>${
+      table[0].tied ? '<span class="level">Dead heat</span>'
+      : split ? '<span class="level">Level</span><small>split on ' + esc(split) + '</small>'
+      : (runner ? '+' + (table[0].pts - runner.pts) : '—')}</dd></div>
     <div class="kpi"><dt>Heats</dt><dd>${heats}</dd></div>
     <div class="kpi"><dt>Fastest solve</dt><dd>${fastest ? fmtTime(fastest.seconds) + '<small>' + esc(fastest.player) + ' &middot; ' + esc(fastest.game) + '</small>' : '&mdash;'}</dd></div>
     <div class="kpi"><dt>Turnout</dt><dd>${turnout}<small>% of ${table.length} active</small></dd></div>
@@ -2042,9 +2146,13 @@ function viewSeason(){
   const body = [...LEDGER].reverse().map(w => `<tr class="${w.done ? '' : 'live'}">
     <td class="pos">#${w.no}</td>
     <td class="who">${shortDate(w.mon)} – ${shortDate(addDays(w.mon,6))}${w.done ? '' : '<span class="flame">live</span>'}</td>
-    <td class="who">${w.champ ? mono(w.champ.player) + '<span class="nmw">' + esc(w.champ.player) + '</span>' : '—'}</td>
+    <td class="who">${w.champs.length ? w.champs.map(c => mono(c.player) + '<span class="nmw">' + esc(c.player) + '</span>').join('<span class="amp">&amp;</span>') : '—'}</td>
     <td class="pts">${w.champ ? w.champ.pts : '—'}</td>
-    <td class="dim">${w.margin != null ? '+' + w.margin : '—'}</td>
+    <td class="dim">${
+      w.shared ? '<span class="level">dead heat</span>'
+      : w.margin ? '+' + w.margin
+      : w.reason ? `<span class="level" title="split on ${esc(w.reason)}">level</span>`
+      : '—'}</td>
     <td class="dim hide-s">${w.runner ? esc(w.runner.player) : '—'}</td>
     <td class="dim hide-s">${w.days}/7</td></tr>`).join('');
 
