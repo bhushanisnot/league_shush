@@ -49,6 +49,10 @@ const POINTS = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
    whatever your earliest logged day is. */
 const SEASON_START = "2026-08-17";
 
+/* How many weeks the season runs before the finale. An ending is what
+   makes the middle weeks matter — set it to 0 for an endless league. */
+const SEASON_WEEKS = 12;
+
 const NAMES = `
 Shashank, Sreshtha Mondal, Aarav Parmar, Mrudang Oza, Shreyansh Choudhary, Shivangi Tikekar, Bhushan Patel, Nisha Patel, Soham Dave
 `;
@@ -728,6 +732,45 @@ const LOG = `
   .step.joint.p1 .nm{font-size:clamp(14px,3.8vw,19px)}
   .step.joint .medal{color:var(--gold)}
 
+  /* ═══════════════ season bar ═══════════════ */
+  .seasonbar{padding:16px var(--pad) 18px}
+  .seasonbar .track{height:6px;border-radius:99px;background:var(--miss);overflow:hidden}
+  .seasonbar .track span{
+    display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,var(--indigo-2),var(--gold));
+  }
+  .seasonbar .marks{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+  .seasonbar .marks i{
+    display:flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:7px;font-style:normal;
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);
+    background:var(--paper);border:1px solid var(--rule-soft);
+  }
+  .seasonbar .marks i.won{background:var(--c);border-color:transparent;color:#fff;font-weight:500}
+  .seasonbar .marks i.now{outline:2px solid var(--indigo);outline-offset:1px}
+  .seasonbar .fine{margin:12px 0 0;font-size:12px;color:var(--faint);line-height:1.5}
+
+  /* ═══════════════ game crowns ═══════════════ */
+  .gts{display:grid;gap:1px;background:var(--rule-soft);
+    grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
+  .gt{background:var(--card);padding:14px var(--pad);border-top:2px solid var(--c)}
+  .gt-game{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .gt-name{display:block;font-family:var(--disp);font-weight:700;font-size:15px;
+    letter-spacing:-.02em;overflow-wrap:break-word}
+  .gt-pts{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+
+  /* ═══════════════ personal bests ═══════════════ */
+  .pbs{display:flex;flex-wrap:wrap;gap:8px;padding:16px var(--pad)}
+  .pb{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:7px 12px;border-radius:999px;
+    background:var(--paper);border:1px solid var(--rule-soft);font-size:12.5px;
+  }
+  .pb b{font-weight:600}
+  .pb-g{color:var(--faint);font-family:var(--mono);font-size:11px}
+  .pb-t{font-family:var(--mono);font-size:12px;color:var(--indigo);font-weight:500}
+
   /* ═══════════════ phones ═══════════════ */
   @media (max-width:639px){
     .hide-s{display:none}
@@ -810,7 +853,111 @@ const LOG = `
     .segmented,.chips,.tools,#modal,#toast,.wbtn{display:none}
     .panel{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
   }
-  /* ═══════════════ monograms ═══════════════ */
+  /* ══════════════════════════════════════════════════════════════
+     REFINEMENT LAYER
+     Appended last so it wins on order. Two jobs: stop anything
+     bleeding sideways at any width, and lift the whole surface.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ─── 1. nothing may push the page sideways ─── */
+  /* Flex and grid children default to min-width:auto, which is what lets
+     a long name shove a row wider than its container. */
+  .panel-head,.window,.legend,.kpi,.rule,.med,.strip,.crowns,.gts,.pbs,
+  .keys,.duel,.duelhead,.duelpick .side,.side-l,.rec-row,.tools,.seasonbar{min-width:0}
+
+  .panel-head{flex-wrap:wrap;row-gap:5px}
+  .panel-head .panel-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+  .window .wk,.window .wr,.window .wd{min-width:0;overflow-wrap:break-word}
+
+  .kpi dd,.kpi dd.name,.gt-name,.step .nm,td.who,.rule dd,.empty,
+  .crown,.pb,.badge,.rec,.foot,.foot-note,.fact dd,.fact dt,.dt,.sheet-head{
+    overflow-wrap:break-word;word-break:normal;hyphens:none;
+  }
+  .kpi dd small{display:inline-block;max-width:100%}
+  .crown,.pb,.badge,.run,.key,.ghost,.rec-row{max-width:100%}
+
+  img,svg,canvas,video{max-width:100%;height:auto}
+  .warn code,.rule code{overflow-wrap:anywhere}
+  .sheet{max-width:min(560px,calc(100vw - 28px))}
+
+  /* ─── 2. surface ─── */
+  :root{
+    --edge:rgba(255,255,255,.9);
+    --shadow-1:0 1px 2px rgba(18,21,29,.045), 0 3px 10px -4px rgba(18,21,29,.07);
+    --shadow-2:0 2px 5px rgba(18,21,29,.05), 0 18px 42px -18px rgba(18,21,29,.28);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --edge:rgba(255,255,255,.055);
+      --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 4px 14px -6px rgba(0,0,0,.55);
+      --shadow-2:0 2px 6px rgba(0,0,0,.55), 0 22px 48px -20px rgba(0,0,0,.85);
+    }
+  }
+  .panel{
+    border-radius:16px;
+    box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge);
+  }
+  .rule,.warn{box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge)}
+
+  /* a slow drift behind everything, so the page never feels inert */
+  body::before{animation:drift 30s ease-in-out infinite}
+  @keyframes drift{
+    0%,100%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(-2.5%,1.5%,0) scale(1.08)}
+  }
+
+  /* ─── 3. masthead ─── */
+  .eyebrow{letter-spacing:.19em;margin-bottom:12px}
+  h1{
+    letter-spacing:-.045em;line-height:.88;text-wrap:balance;
+    filter:drop-shadow(0 1px 0 var(--edge));
+  }
+  .tagline{letter-spacing:.005em}
+
+  /* ─── 4. controls ─── */
+  .segmented{
+    border-radius:13px;
+    box-shadow:inset 0 1px 3px color-mix(in srgb,var(--ink) 7%,transparent);
+  }
+  .segmented button{border-radius:9px;letter-spacing:-.005em}
+  .chip{border-radius:999px}
+  #view .chip{border-radius:11px}
+
+  /* ─── 5. numbers carry the page ─── */
+  .kpi dd{letter-spacing:-.02em;font-feature-settings:"tnum" 1,"zero" 1}
+  td.pts{letter-spacing:-.02em}
+  .window .wk{letter-spacing:-.03em}
+
+  /* ─── 6. podium ─── */
+  .podium{border-radius:16px 16px 0 0;overflow:hidden}
+  .step{padding-bottom:22px}
+  .step .medal{letter-spacing:.19em}
+  .step.p1{
+    background:
+      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb,var(--gold) 20%,transparent), transparent 62%),
+      linear-gradient(180deg, color-mix(in srgb,var(--gold) 10%,var(--card)), var(--card) 66%);
+  }
+  .step.p1 .nm{letter-spacing:-.03em}
+
+  /* ─── 7. rhythm ─── */
+  .panel{margin-bottom:20px}
+  .rules{gap:12px;margin-bottom:24px}
+  .foot{margin-top:32px}
+
+  @media (min-width:1024px){
+    h1{font-size:clamp(48px,4.6vw,66px)}
+    .panel{margin-bottom:22px}
+    .step.p1{padding-top:46px;padding-bottom:38px}
+  }
+  @media (max-width:639px){
+    .panel{border-radius:14px;margin-bottom:16px}
+    .rules{gap:10px}
+    /* the two stacked sticky bars are the tightest thing on a phone —
+       leave their geometry alone, just keep them opaque enough to read */
+    .segmented,.chips{background:color-mix(in srgb,var(--board) 92%,transparent)}
+  }
+
   .step .crest + .nm{margin-top:8px}
   .pip{
     display:inline-block;vertical-align:middle;
@@ -1367,6 +1514,30 @@ const LEDGER = MONDAYS.map(mon => {
 const TITLES = {};
 LEDGER.filter(w => w.done).forEach(w =>
   w.champs.forEach(c => { TITLES[c.player] = (TITLES[c.player] || 0) + 1; }));
+
+/* ───────────────────── honours ───────────────────── */
+/* One crown per game, so nine players are chasing seven things. */
+const GAMETITLES = GAMELIST.map(g => {
+  const t = tally(RUNS.filter(r => r.game === g));
+  const holders = t.filter(r => r.rank === 1);
+  return { game:g, holders, runner: t.find(r => r.rank > 1) || null, played: t.length };
+}).filter(x => x.holders.length);
+
+/* Records already exist further down — reusing that structure. */
+
+/* Every player's own best in every game, and when it was set — so a
+   seventh-placed week can still put someone on the front page. */
+const PBEST = (() => {
+  const best = {};
+  RUNS.filter(r => !r.missed).forEach(r => {
+    const k = r.player + '|' + r.game;
+    if(!best[k] || r.seconds < best[k].seconds) best[k] = r;
+  });
+  return Object.values(best);
+})();
+const pbsInWeek = mon => PBEST.filter(r => mondayOf(r.date) === mon)
+  .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.player.localeCompare(b.player));
+
 
 /* ───────────────────── course records ───────────────────── */
 /* The fastest solve ever logged for each game, and who holds it. */
@@ -2167,7 +2338,43 @@ function viewSeason(){
   const roll = Object.entries(TITLES).sort((a,b) => b[1] - a[1]).map(([p,n]) =>
     `<span class="crown">${mono(p)}${esc(p)}<b>${'★'.repeat(Math.min(n,5))}${n > 5 ? ' ×'+n : ''}</b></span>`).join('');
 
-  return `
+  const seasonBar = (() => {
+    if(!SEASON_WEEKS) return '';
+    const now = Math.max(...LEDGER.map(w => w.no));
+    const left = Math.max(0, SEASON_WEEKS - now);
+    const pct = Math.min(100, Math.round(now / SEASON_WEEKS * 100));
+    return `<div class="panel">
+      <div class="panel-head"><span class="panel-title">Season · ${SEASON_WEEKS} weeks</span>
+        <span class="panel-title">${left ? left + ' to play' : 'finale'}</span></div>
+      <div class="seasonbar">
+        <div class="track"><span style="width:${pct}%"></span></div>
+        <div class="marks">${Array.from({length:SEASON_WEEKS}, (_,i) => {
+          const w = LEDGER.find(x => x.no === i+1);
+          const won = w && w.done && w.champs.length ? w.champs[0].player : null;
+          return `<i class="${i+1 === now ? 'now' : ''}${won ? ' won' : ''}"
+            style="${won ? '--c:' + colorOf(won) : ''}"
+            title="Week ${i+1}${won ? ' — ' + won : ''}">${i+1}</i>`;
+        }).join('')}</div>
+        <p class="fine">Week ${now} of ${SEASON_WEEKS}. ${left
+          ? 'The final week decides it — a bad patch now is recoverable, a bad patch in week ' + SEASON_WEEKS + ' is not.'
+          : 'This is the finale.'}</p>
+      </div>
+    </div>`;
+  })();
+
+  const titles = GAMETITLES.map(g => `<div class="gt" style="--c:${colorOf(g.holders[0].player)}">
+      <span class="gt-game">${esc(g.game)}</span>
+      <span class="gt-name">${g.holders.map(h => esc(h.player)).join(' & ')}</span>
+      <span class="gt-pts">${g.holders[0].pts} pts${g.runner ? ' · +' + (g.holders[0].pts - g.runner.pts) : ''}</span>
+    </div>`).join('');
+
+  const pbs = pbsInWeek(ui.weekMon);
+  const pbList = pbs.length ? pbs.map(r => `<span class="pb">
+      ${mono(r.player)}<b>${esc(r.player)}</b>
+      <span class="pb-g">${esc(r.game)}</span>
+      <span class="pb-t">${fmtTime(r.seconds)}</span></span>`).join('') : '';
+
+  return seasonBar + `
   <div class="panel"><dl class="kpis">
     <div class="kpi"><dt>Weeks finished</dt><dd>${done.length}</dd></div>
     <div class="kpi"><dt>Different champions</dt><dd>${champs.length}</dd></div>
@@ -2181,7 +2388,18 @@ function viewSeason(){
     <div class="panel-head"><span class="panel-title">Every week</span><span class="panel-title">tap a week to open it</span></div>
     <table><thead><tr><th>Wk</th><th class="who">Dates</th><th class="who">Champion</th><th>Pts</th><th>Margin</th>
       <th class="hide-s">Runner-up</th><th class="hide-s">Days</th></tr></thead><tbody>${body}</tbody></table>
-  </div>` + recordsPanel();
+  </div>
+  ${titles ? `<div class="panel">
+    <div class="panel-head"><span class="panel-title">Game crowns</span>
+      <span class="panel-title">most points, all time</span></div>
+    <div class="gts">${titles}</div>
+    <div class="legend">Seven crowns instead of one — you can be worst in the league and still own a game.</div>
+  </div>` : ''}
+  ${pbList ? `<div class="panel">
+    <div class="panel-head"><span class="panel-title">Personal bests · week #${weekNo(ui.weekMon)}</span>
+      <span class="panel-title">${pbs.length} set</span></div>
+    <div class="pbs">${pbList}</div>
+  </div>` : ''}` + recordsPanel();
 }
 
 /* ─────────────────────────── render ─────────────────────────── */
