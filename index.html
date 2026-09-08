@@ -39,11 +39,12 @@
 
 const LEAGUE = "The Daily League";
 
+
 /* Points for 1st, 2nd, 3rd … Edit freely — the whole site recalculates
    from it, including every past week. A steeper front end (say
    14,10,8,6,5,4,3,2,1) rewards winning harder; a flat one rewards
    turning up. */
-const POINTS = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+const POINTS = [10, 9, 8, 7, 6, 5, 4, 3, 2];
 
 /* Monday that Week #1 begins on. Leave it blank to number weeks from
    whatever your earliest logged day is. */
@@ -230,13 +231,16 @@ const LOG = `
 <style>
   /* ═══════════════ tokens ═══════════════ */
   :root{
-    --board:#E7EBF3; --paper:#F5F8FC; --card:#FFFFFF;
-    --ink:#12151D; --muted:#59627A; --faint:#8B94A9;
-    --rule:#CDD4E2; --rule-soft:#E6EAF2;
-    --indigo:#242F84; --indigo-2:#4453C4; --indigo-soft:#ECEEF9; --on-indigo:#FFFFFF;
-    --gold:#BE871C; --silver:#8593A8; --bronze:#A8632F;
-    --miss:#DEE3EC; --plain:#93A6CE;
-    --warn-bg:#FBF3E3; --warn-line:#E4CF9E; --warn-ink:#6A5628; --warn-strong:#4E3F17; --warn-code:#F1E5C7;
+    /* W5H — navy #1F3249, pale #D4E1E9, red #EE3A35, mint #59D9BB */
+    --board:#D4E1E9; --paper:#EAF1F6; --card:#FFFFFF;
+    --ink:#1F3249; --muted:#5A7086; --faint:#8AA0B4;
+    --rule:#B7CAD8; --rule-soft:#DCE7EE;
+    --indigo:#1F3249; --indigo-2:#33506F; --indigo-soft:#E6EEF4; --on-indigo:#FFFFFF;
+    --gold:#EE3A35; --silver:#4A6A8A; --bronze:#2E9E86;
+    --mint:#59D9BB; --red:#EE3A35;
+    --miss:#CBD9E3; --plain:#8FA9BE;
+    --up:#2E9E86; --down:#EE3A35;
+    --warn-bg:#FBEDE9; --warn-line:#F0BDB6; --warn-ink:#8C3B32; --warn-strong:#6B2B24; --warn-code:#F7DDD8;
     --shadow-1:0 1px 2px rgba(18,21,29,.05), 0 2px 6px rgba(18,21,29,.035);
     --shadow-2:0 2px 4px rgba(18,21,29,.05), 0 14px 32px -12px rgba(18,21,29,.16);
     --grid:30px;
@@ -250,13 +254,15 @@ const LOG = `
   }
   @media (prefers-color-scheme:dark){
     :root{
-      --board:#0B0E16; --paper:#151A28; --card:#171D2C;
-      --ink:#E8ECF6; --muted:#97A2BC; --faint:#6D7791;
-      --rule:#222A3C; --rule-soft:#222A3B;
-      --indigo:#8E9CFF; --indigo-2:#AEB7FF; --indigo-soft:#1A2137; --on-indigo:#0B0E16;
-      --gold:#E4B23E; --silver:#A6B3C9; --bronze:#CE8850;
-      --miss:#202737; --plain:#48598A;
-      --warn-bg:#2A2313; --warn-line:#574820; --warn-ink:#E5CE96; --warn-strong:#F3E2B6; --warn-code:#3B3119;
+      --board:#101B27; --paper:#182634; --card:#1B2C3F;
+      --ink:#D4E1E9; --muted:#9BB1C3; --faint:#6D8398;
+      --rule:#2A3E54; --rule-soft:#26394D;
+      --indigo:#59D9BB; --indigo-2:#7FE5CE; --indigo-soft:#16303A; --on-indigo:#0C1620;
+      --gold:#FF5A55; --silver:#A7BDD0; --bronze:#59D9BB;
+      --mint:#59D9BB; --red:#FF5A55;
+      --miss:#233444; --plain:#4C6B87;
+      --up:#59D9BB; --down:#FF6B66;
+      --warn-bg:#33201D; --warn-line:#6B3A34; --warn-ink:#F0BDB6; --warn-strong:#F7DDD8; --warn-code:#432925;
       --shadow-1:0 1px 2px rgba(0,0,0,.45);
       --shadow-2:0 14px 34px -14px rgba(0,0,0,.75);
     }
@@ -760,17 +766,6 @@ const LOG = `
     letter-spacing:-.02em;overflow-wrap:break-word}
   .gt-pts{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
 
-  /* ═══════════════ personal bests ═══════════════ */
-  .pbs{display:flex;flex-wrap:wrap;gap:8px;padding:16px var(--pad)}
-  .pb{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:7px 12px;border-radius:999px;
-    background:var(--paper);border:1px solid var(--rule-soft);font-size:12.5px;
-  }
-  .pb b{font-weight:600}
-  .pb-g{color:var(--faint);font-family:var(--mono);font-size:11px}
-  .pb-t{font-family:var(--mono);font-size:12px;color:var(--indigo);font-weight:500}
-
   /* ═══════════════ phones ═══════════════ */
   @media (max-width:639px){
     .hide-s{display:none}
@@ -853,111 +848,6 @@ const LOG = `
     .segmented,.chips,.tools,#modal,#toast,.wbtn{display:none}
     .panel{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
   }
-  /* ══════════════════════════════════════════════════════════════
-     REFINEMENT LAYER
-     Appended last so it wins on order. Two jobs: stop anything
-     bleeding sideways at any width, and lift the whole surface.
-     ══════════════════════════════════════════════════════════════ */
-
-  /* ─── 1. nothing may push the page sideways ─── */
-  /* Flex and grid children default to min-width:auto, which is what lets
-     a long name shove a row wider than its container. */
-  .panel-head,.window,.legend,.kpi,.rule,.med,.strip,.crowns,.gts,.pbs,
-  .keys,.duel,.duelhead,.duelpick .side,.side-l,.rec-row,.tools,.seasonbar{min-width:0}
-
-  .panel-head{flex-wrap:wrap;row-gap:5px}
-  .panel-head .panel-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
-
-  .window .wk,.window .wr,.window .wd{min-width:0;overflow-wrap:break-word}
-
-  .kpi dd,.kpi dd.name,.gt-name,.step .nm,td.who,.rule dd,.empty,
-  .crown,.pb,.badge,.rec,.foot,.foot-note,.fact dd,.fact dt,.dt,.sheet-head{
-    overflow-wrap:break-word;word-break:normal;hyphens:none;
-  }
-  .kpi dd small{display:inline-block;max-width:100%}
-  .crown,.pb,.badge,.run,.key,.ghost,.rec-row{max-width:100%}
-
-  img,svg,canvas,video{max-width:100%;height:auto}
-  .warn code,.rule code{overflow-wrap:anywhere}
-  .sheet{max-width:min(560px,calc(100vw - 28px))}
-
-  /* ─── 2. surface ─── */
-  :root{
-    --edge:rgba(255,255,255,.9);
-    --shadow-1:0 1px 2px rgba(18,21,29,.045), 0 3px 10px -4px rgba(18,21,29,.07);
-    --shadow-2:0 2px 5px rgba(18,21,29,.05), 0 18px 42px -18px rgba(18,21,29,.28);
-  }
-  @media (prefers-color-scheme:dark){
-    :root{
-      --edge:rgba(255,255,255,.055);
-      --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 4px 14px -6px rgba(0,0,0,.55);
-      --shadow-2:0 2px 6px rgba(0,0,0,.55), 0 22px 48px -20px rgba(0,0,0,.85);
-    }
-  }
-  .panel{
-    border-radius:16px;
-    box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge);
-  }
-  .rule,.warn{box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge)}
-
-  /* a slow drift behind everything, so the page never feels inert */
-  body::before{animation:drift 30s ease-in-out infinite}
-  @keyframes drift{
-    0%,100%{transform:translate3d(0,0,0) scale(1)}
-    50%{transform:translate3d(-2.5%,1.5%,0) scale(1.08)}
-  }
-
-  /* ─── 3. masthead ─── */
-  .eyebrow{letter-spacing:.19em;margin-bottom:12px}
-  h1{
-    letter-spacing:-.045em;line-height:.88;text-wrap:balance;
-    filter:drop-shadow(0 1px 0 var(--edge));
-  }
-  .tagline{letter-spacing:.005em}
-
-  /* ─── 4. controls ─── */
-  .segmented{
-    border-radius:13px;
-    box-shadow:inset 0 1px 3px color-mix(in srgb,var(--ink) 7%,transparent);
-  }
-  .segmented button{border-radius:9px;letter-spacing:-.005em}
-  .chip{border-radius:999px}
-  #view .chip{border-radius:11px}
-
-  /* ─── 5. numbers carry the page ─── */
-  .kpi dd{letter-spacing:-.02em;font-feature-settings:"tnum" 1,"zero" 1}
-  td.pts{letter-spacing:-.02em}
-  .window .wk{letter-spacing:-.03em}
-
-  /* ─── 6. podium ─── */
-  .podium{border-radius:16px 16px 0 0;overflow:hidden}
-  .step{padding-bottom:22px}
-  .step .medal{letter-spacing:.19em}
-  .step.p1{
-    background:
-      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb,var(--gold) 20%,transparent), transparent 62%),
-      linear-gradient(180deg, color-mix(in srgb,var(--gold) 10%,var(--card)), var(--card) 66%);
-  }
-  .step.p1 .nm{letter-spacing:-.03em}
-
-  /* ─── 7. rhythm ─── */
-  .panel{margin-bottom:20px}
-  .rules{gap:12px;margin-bottom:24px}
-  .foot{margin-top:32px}
-
-  @media (min-width:1024px){
-    h1{font-size:clamp(48px,4.6vw,66px)}
-    .panel{margin-bottom:22px}
-    .step.p1{padding-top:46px;padding-bottom:38px}
-  }
-  @media (max-width:639px){
-    .panel{border-radius:14px;margin-bottom:16px}
-    .rules{gap:10px}
-    /* the two stacked sticky bars are the tightest thing on a phone —
-       leave their geometry alone, just keep them opaque enough to read */
-    .segmented,.chips{background:color-mix(in srgb,var(--board) 92%,transparent)}
-  }
-
   .step .crest + .nm{margin-top:8px}
   .pip{
     display:inline-block;vertical-align:middle;
@@ -976,7 +866,7 @@ const LOG = `
      model and lets rows size independently, which is what threw the
      standings rows out of line. */
   td.who{vertical-align:middle}
-  td.who .nmw{display:inline-block;vertical-align:middle;min-width:0}
+  td.who .nmw{display:inline;min-width:0}
   .title{
     color:var(--gold);font-family:var(--mono);font-size:10px;
     margin-left:6px;font-weight:500;letter-spacing:.02em;
@@ -984,7 +874,7 @@ const LOG = `
 
   /* ═══════════════ movement, medals, form ═══════════════ */
   .mv{display:block;font-family:var(--mono);font-size:9.5px;margin-top:2px;letter-spacing:0}
-  .mv.up{color:#2E9E6B} .mv.down{color:#C4553F} .mv.flat{color:var(--miss)}
+  .mv.up{color:var(--up)} .mv.down{color:var(--down)} .mv.flat{color:var(--miss)}
   .med{display:inline-flex;gap:6px;justify-content:flex-end}
   .med i{
     font-style:normal;font-family:var(--mono);font-size:10.5px;font-weight:500;
@@ -995,7 +885,7 @@ const LOG = `
   .med i.b{background:color-mix(in srgb,var(--bronze) 26%,transparent)}
   .form{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
   .form i{font-style:normal;font-size:9px;margin-left:3px}
-  .form.up{color:#2E9E6B} .form.down{color:#C4553F} .form.flat{color:var(--faint)}
+  .form.up{color:var(--up)} .form.down{color:var(--down)} .form.flat{color:var(--faint)}
   td.pts small,td.dim small{
     display:block;font-family:var(--mono);font-size:9.5px;
     color:var(--faint);font-weight:400;margin-top:1px;
@@ -1058,8 +948,8 @@ const LOG = `
     background:var(--paper);border:1px solid var(--rule-soft);
   }
   .badge b{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:500;color:var(--faint)}
-  .badge.good{border-left:3px solid #2E9E6B}
-  .badge.bad{border-left:3px solid #C4553F}
+  .badge.good{border-left:3px solid var(--up)}
+  .badge.bad{border-left:3px solid var(--down)}
   .badge.gold{border-left:3px solid var(--gold)}
 
   /* ═══════════════ records ═══════════════ */
@@ -1177,6 +1067,144 @@ const LOG = `
     .pip{height:16px;margin-right:7px}
     .med i{min-width:18px;padding:2px 4px;font-size:10px}
     .rec-row{grid-template-columns:1fr auto}
+  }
+
+
+  /* ══════════════════════════════════════════════════════════════
+     REFINEMENT LAYER — must stay last in this stylesheet so it wins
+     on cascade order. Two jobs: stop anything bleeding sideways at
+     any width, and carry the W5H palette through the components.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ─── 1. nothing may push the page sideways ─── */
+  /* Flex and grid children default to min-width:auto, which is what lets
+     one long name shove a row wider than its container. */
+  .panel-head,.window,.legend,.kpi,.rule,.med,.strip,.crowns,.gts,
+  .keys,.duel,.duelhead,.duelpick .side,.side-l,.rec-row,.tools,
+  .seasonbar,.facts,.sheet-head{min-width:0}
+  .panel-head{flex-wrap:wrap;row-gap:5px}
+  .panel-head .panel-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .window .wk,.window .wr,.window .wd{min-width:0;overflow-wrap:break-word}
+  .kpi dd,.kpi dd.name,.gt-name,.step .nm,td.who,.rule dd,.empty,
+  .crown,.badge,.rec,.foot,.foot-note,.fact dd,.fact dt,.sheet-head{
+    overflow-wrap:break-word;word-break:normal;hyphens:none;
+  }
+  .kpi dd small{display:inline-block;max-width:100%}
+  .crown,.badge,.run,.key,.ghost,.rec-row{max-width:100%}
+  img,svg,canvas,video{max-width:100%;height:auto}
+  .warn code,.rule code{overflow-wrap:anywhere}
+  .sheet{max-width:min(560px,calc(100vw - 28px))}
+  /* the name is inline so it starts beside its pip instead of below it */
+  .nmw{display:inline}
+  td.who .pip{margin-right:8px}
+
+  /* ─── 2. surface ─── */
+  :root{
+    --edge:rgba(255,255,255,.85);
+    --shadow-1:0 1px 2px rgba(31,50,73,.06), 0 3px 10px -4px rgba(31,50,73,.10);
+    --shadow-2:0 2px 5px rgba(31,50,73,.07), 0 18px 42px -18px rgba(31,50,73,.30);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --edge:rgba(212,225,233,.06);
+      --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 4px 14px -6px rgba(0,0,0,.55);
+      --shadow-2:0 2px 6px rgba(0,0,0,.55), 0 22px 48px -20px rgba(0,0,0,.85);
+    }
+  }
+  .panel{border-radius:16px;box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge);margin-bottom:20px}
+  .rule,.warn{box-shadow:var(--shadow-1), inset 0 1px 0 var(--edge)}
+  body::before{animation:drift 30s ease-in-out infinite}
+  @keyframes drift{
+    0%,100%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(-2.5%,1.5%,0) scale(1.08)}
+  }
+
+  /* ─── 3. masthead and controls ─── */
+  .eyebrow{letter-spacing:.19em;margin-bottom:12px;color:var(--red)}
+  h1{
+    letter-spacing:-.045em;line-height:.88;text-wrap:balance;
+    background:linear-gradient(100deg,var(--ink) 16%,var(--red) 52%,var(--ink) 84%);
+    background-size:230% 100%;background-position:0 0;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    transition:background-position .9s var(--ease);
+  }
+  .segmented{border-radius:13px;box-shadow:inset 0 1px 3px color-mix(in srgb,var(--ink) 8%,transparent)}
+  .segmented button{border-radius:9px}
+  #view .chip{border-radius:11px}
+  .kpi dd{letter-spacing:-.02em;font-feature-settings:"tnum" 1}
+  td.pts{letter-spacing:-.02em}
+  .rules{gap:12px;margin-bottom:24px}
+  .rule.wide{border-left-color:var(--red)}
+  .foot{margin-top:32px}
+  .curve i:nth-child(1){background:color-mix(in srgb,var(--red) 20%,var(--card))}
+  .curve i:nth-child(2){background:color-mix(in srgb,var(--silver) 20%,var(--card))}
+  .curve i:nth-child(3){background:color-mix(in srgb,var(--bronze) 20%,var(--card))}
+
+  /* ─── 4. the top three, given some theatre ─── */
+  .podium{border-radius:16px 16px 0 0;overflow:hidden;grid-template-columns:1fr 1.3fr 1fr}
+  .step{
+    position:relative;padding-bottom:22px;border-top:0;
+    background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 3%,var(--card)),var(--card) 40%);
+  }
+  .step.p1{
+    padding-top:34px;padding-bottom:30px;
+    background:
+      radial-gradient(130% 100% at 50% 0%, color-mix(in srgb,var(--red) 22%,transparent), transparent 66%),
+      linear-gradient(180deg, color-mix(in srgb,var(--red) 9%,var(--card)), var(--card) 70%);
+  }
+  .step.p2{padding-top:26px;
+    background:
+      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb,var(--silver) 18%,transparent), transparent 62%),
+      var(--card);
+  }
+  .step.p3{
+    background:
+      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb,var(--mint) 26%,transparent), transparent 62%),
+      var(--card);
+  }
+  .step .medal{letter-spacing:.19em;font-weight:500}
+  .step.p1 .medal{color:var(--gold)}
+  .step.p2 .medal{color:var(--silver)}
+  .step.p3 .medal{color:var(--bronze)}
+  .step .nm{letter-spacing:-.03em}
+  .step.p1 .nm{letter-spacing:-.035em}
+  .step .pt b{font-weight:600}
+  .step::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;z-index:2;background:var(--miss)}
+  .step.p1::before{background:linear-gradient(90deg,transparent,var(--gold),transparent);height:4px}
+  .step.p2::before{background:linear-gradient(90deg,transparent,var(--silver),transparent)}
+  .step.p3::before{background:linear-gradient(90deg,transparent,var(--bronze),transparent)}
+
+  /* ─── 5. top three on every leaderboard, main and secondary ─── */
+  tr.r1 td,tr.r1 td:first-child{background:color-mix(in srgb,var(--gold) 8%,var(--card))}
+  tr.r2 td,tr.r2 td:first-child{background:color-mix(in srgb,var(--silver) 8%,var(--card))}
+  tr.r3 td,tr.r3 td:first-child{background:color-mix(in srgb,var(--bronze) 8%,var(--card))}
+  tr.r1:hover td,tr.r1:hover td:first-child{background:color-mix(in srgb,var(--gold) 14%,var(--card))}
+  tr.r2:hover td,tr.r2:hover td:first-child{background:color-mix(in srgb,var(--silver) 14%,var(--card))}
+  tr.r3:hover td,tr.r3:hover td:first-child{background:color-mix(in srgb,var(--bronze) 14%,var(--card))}
+  tr.r1 td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+  tr.r2 td:first-child{box-shadow:inset 3px 0 0 var(--silver)}
+  tr.r3 td:first-child{box-shadow:inset 3px 0 0 var(--bronze)}
+  tr.r1 td.pts{color:var(--gold);font-weight:600}
+  tr.r2 td.pts{color:var(--silver);font-weight:600}
+  tr.r3 td.pts{color:var(--bronze);font-weight:600}
+  .eqp,.level{color:var(--gold)}
+  .seasonbar .track span{background:linear-gradient(90deg,var(--mint),var(--red))}
+
+  @media (min-width:1024px){
+    h1{font-size:clamp(48px,4.6vw,66px)}
+    .step.p1{padding-top:48px;padding-bottom:40px}
+    .step.p2{padding-top:34px}
+  }
+  @media (hover:hover) and (pointer:fine){
+    h1:hover{background-position:100% 0}
+  }
+  @media (max-width:639px){
+    .panel{border-radius:14px;margin-bottom:16px}
+    .rules{gap:10px}
+    .segmented,.chips{background:color-mix(in srgb,var(--board) 92%,transparent)}
+    .podium{grid-template-columns:1fr 1.2fr 1fr}
+    td.who{min-width:8.5em}
+    td.who .pip{margin-right:6px}
   }
 
 </style>
@@ -1525,18 +1553,6 @@ const GAMETITLES = GAMELIST.map(g => {
 
 /* Records already exist further down — reusing that structure. */
 
-/* Every player's own best in every game, and when it was set — so a
-   seventh-placed week can still put someone on the front page. */
-const PBEST = (() => {
-  const best = {};
-  RUNS.filter(r => !r.missed).forEach(r => {
-    const k = r.player + '|' + r.game;
-    if(!best[k] || r.seconds < best[k].seconds) best[k] = r;
-  });
-  return Object.values(best);
-})();
-const pbsInWeek = mon => PBEST.filter(r => mondayOf(r.date) === mon)
-  .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.player.localeCompare(b.player));
 
 
 /* ───────────────────── course records ───────────────────── */
@@ -1771,7 +1787,7 @@ function drawWrap(canvas){
   const heats = new Set(fin.map(r => r.date + r.game)).size;
 
   const bg = c.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#1B2468'); bg.addColorStop(.55,'#242F84'); bg.addColorStop(1,'#12163C');
+  bg.addColorStop(0,'#1B2C3F'); bg.addColorStop(.55,'#1F3249'); bg.addColorStop(1,'#101B27');
   c.fillStyle = bg; c.fillRect(0,0,W,H);
   c.strokeStyle = 'rgba(255,255,255,.055)'; c.lineWidth = 1;
   for(let i = 60; i < W; i += 60){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,H); c.stroke(); }
@@ -1804,7 +1820,7 @@ function drawWrap(canvas){
   c.fillStyle = 'rgba(255,255,255,.07)';
   roundRect(c, 64, 356, W-128, 300, 32); c.fill();
 
-  c.fillStyle = '#E4B23E'; c.font = monoF(22); c.letterSpacing = '6px';
+  c.fillStyle = '#EE3A35'; c.font = monoF(22); c.letterSpacing = '6px';
   c.fillText((weekDone(ui.weekMon) || ui.period !== 'W' ? 'CHAMPION' : 'LEADING') +
              (shared ? 'S · SHARED' : ''), 108, 424);
   c.letterSpacing = '0px';
@@ -1834,7 +1850,7 @@ function drawWrap(canvas){
     if(!r) return;
     const y = 730 + i * 96;
     c.fillStyle = 'rgba(255,255,255,.05)'; roundRect(c, 64, y - 46, W-128, 88, 22); c.fill();
-    c.fillStyle = i ? '#CE8850' : '#A6B3C9'; c.font = disp('800 40px');
+    c.fillStyle = i ? '#59D9BB' : '#A7BDD0'; c.font = disp('800 40px');
     c.fillText(String(r.rank), 104, y + 14);
     c.fillStyle = colorOf(r.player); roundRect(c, 176, y - 22, 10, 44, 5); c.fill();
     c.fillStyle = '#fff'; c.font = disp('700 40px');
@@ -1852,7 +1868,7 @@ function drawWrap(canvas){
   c.fillText('HOW IT WENT', 80, 918); c.letterSpacing = '0px';
   c.font = disp('700 40px');
   const story = runner
-    ? [['#E4B23E', (champ.pts - runner.pts) + ' points'], ['rgba(255,255,255,.86)', ' in it after ' + heats + ' heats']]
+    ? [['#EE3A35', (champ.pts - runner.pts) + ' points'], ['rgba(255,255,255,.86)', ' in it after ' + heats + ' heats']]
     : [['rgba(255,255,255,.86)', heats + ' heats played']];
   let sx = 80;
   story.forEach(([col, txt]) => { c.fillStyle = col; c.fillText(txt, sx, 972); sx += mid(txt); });
@@ -2093,7 +2109,7 @@ function viewGames(rows){
     const bestIn = {};
     cols.forEach(g => { bestIn[g] = Math.max(...table.map(r =>
       rows.filter(x => x.player === r.player && x.game === g).reduce((a,x) => a + x.points, 0))); });
-    const body = table.map(r => `<tr>
+    const body = table.map(r => `<tr class="r${r.rank <= 3 ? r.rank : ''}">
       <td class="who">${mono(r.player)}<span class="nmw">${esc(r.player)}</span></td>
       ${cols.map(g => {
         const p = rows.filter(x => x.player === r.player && x.game === g).reduce((a,x) => a + x.points, 0);
@@ -2103,7 +2119,7 @@ function viewGames(rows){
     return picker + `<div class="panel">
       <div class="panel-head"><span class="panel-title">Points by game</span><span class="panel-title">best in each column highlighted</span></div>
       <table><thead><tr><th>Player</th>${cols.map(g => `<th>${esc(g)}</th>`).join('')}<th>Total</th></tr></thead>
-      <tbody>${body}</tbody></table></div>` + recordsPanel();
+      <tbody>${body}</tbody></table></div>` + crownsPanel() + recordsPanel();
   }
 
   const gr = rows.filter(r => r.game === ui.game);
@@ -2149,6 +2165,21 @@ function viewGames(rows){
   </div>
   <div class="panel">
     <div class="panel-head"><span class="panel-title">Recent heats</span></div>${recent}
+  </div>`;
+}
+
+/* One crown per game — you can sit last in the league and still own one. */
+function crownsPanel(){
+  if(!GAMETITLES.length) return '';
+  const cards = GAMETITLES.map(g => `<div class="gt" style="--c:${colorOf(g.holders[0].player)}">
+      <span class="gt-game">${esc(g.game)}</span>
+      <span class="gt-name">${g.holders.map(h => esc(h.player)).join(' & ')}</span>
+      <span class="gt-pts">${g.holders[0].pts} pts${g.runner ? ' · +' + (g.holders[0].pts - g.runner.pts) : ''}</span>
+    </div>`).join('');
+  return `<div class="panel">
+    <div class="panel-head"><span class="panel-title">Game crowns</span>
+      <span class="panel-title">most points, all time</span></div>
+    <div class="gts">${cards}</div>
   </div>`;
 }
 
@@ -2362,18 +2393,6 @@ function viewSeason(){
     </div>`;
   })();
 
-  const titles = GAMETITLES.map(g => `<div class="gt" style="--c:${colorOf(g.holders[0].player)}">
-      <span class="gt-game">${esc(g.game)}</span>
-      <span class="gt-name">${g.holders.map(h => esc(h.player)).join(' & ')}</span>
-      <span class="gt-pts">${g.holders[0].pts} pts${g.runner ? ' · +' + (g.holders[0].pts - g.runner.pts) : ''}</span>
-    </div>`).join('');
-
-  const pbs = pbsInWeek(ui.weekMon);
-  const pbList = pbs.length ? pbs.map(r => `<span class="pb">
-      ${mono(r.player)}<b>${esc(r.player)}</b>
-      <span class="pb-g">${esc(r.game)}</span>
-      <span class="pb-t">${fmtTime(r.seconds)}</span></span>`).join('') : '';
-
   return seasonBar + `
   <div class="panel"><dl class="kpis">
     <div class="kpi"><dt>Weeks finished</dt><dd>${done.length}</dd></div>
@@ -2388,18 +2407,7 @@ function viewSeason(){
     <div class="panel-head"><span class="panel-title">Every week</span><span class="panel-title">tap a week to open it</span></div>
     <table><thead><tr><th>Wk</th><th class="who">Dates</th><th class="who">Champion</th><th>Pts</th><th>Margin</th>
       <th class="hide-s">Runner-up</th><th class="hide-s">Days</th></tr></thead><tbody>${body}</tbody></table>
-  </div>
-  ${titles ? `<div class="panel">
-    <div class="panel-head"><span class="panel-title">Game crowns</span>
-      <span class="panel-title">most points, all time</span></div>
-    <div class="gts">${titles}</div>
-    <div class="legend">Seven crowns instead of one — you can be worst in the league and still own a game.</div>
-  </div>` : ''}
-  ${pbList ? `<div class="panel">
-    <div class="panel-head"><span class="panel-title">Personal bests · week #${weekNo(ui.weekMon)}</span>
-      <span class="panel-title">${pbs.length} set</span></div>
-    <div class="pbs">${pbList}</div>
-  </div>` : ''}` + recordsPanel();
+  </div>`;
 }
 
 /* ─────────────────────────── render ─────────────────────────── */
